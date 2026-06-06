@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Baileys WhatsApp auth directory (replaced by Evolution API)
+.whatsapp-auth/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
