@@ -32,6 +32,15 @@ type AudienceGroup = {
 
 type ConnectionState = "open" | "connecting" | "close" | "unknown"
 
+const INSTANCE_NAME = "primary"
+
+const TYPE_LABELS: Record<string, string> = {
+  update: "Update",
+  maintenance: "Maintenance",
+  new: "New",
+  alert: "Alert",
+}
+
 function normalizePhone(value: string): string {
   return String(value || "").replace(/[^\d]/g, "")
 }
@@ -44,17 +53,27 @@ function randomDelay(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  update: "Update",
-  maintenance: "Maintenance",
-  new: "New",
-  alert: "Alert",
+async function api(method: string, path: string, body?: unknown) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 15000)
+  try {
+    const res = await fetch(path, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => "")
+      throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`)
+    }
+    return res.json()
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 export default function AnnouncementsPage() {
-  const [baseUrl, setBaseUrl] = useState("http://localhost:8080")
-  const [instanceName, setInstanceName] = useState("evolution")
-  const [apiKey, setApiKey] = useState("429683C4C977415CAAFCCE10F7D57E11")
   const [connectionState, setConnectionState] = useState<ConnectionState>("unknown")
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [isRunning, setIsRunning] = useState(false)
@@ -87,53 +106,6 @@ export default function AnnouncementsPage() {
     setStatusIsError(isError)
   }
 
-  function saveConfig() {
-    try {
-      localStorage.setItem("wa_connection_config_v1", JSON.stringify({ baseUrl, instanceName, apiKey }))
-    } catch {}
-  }
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("wa_connection_config_v1")
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (parsed.baseUrl) setBaseUrl(parsed.baseUrl)
-        if (parsed.instanceName) setInstanceName(parsed.instanceName)
-        if (parsed.apiKey) setApiKey(parsed.apiKey)
-      }
-    } catch {}
-  }, [])
-
-  function getConfig() {
-    const url = baseUrl.trim().replace(/\/+$/, "")
-    const name = instanceName.trim()
-    const key = apiKey.trim()
-    if (!url || !name || !key) throw new Error("Base URL, Instance Name, and API Key are required.")
-    return { baseUrl: url, instanceName: name, apiKey: key }
-  }
-
-  async function api(method: string, path: string, body?: unknown) {
-    const cfg = getConfig()
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 15000)
-    try {
-      const res = await fetch(`${cfg.baseUrl}${path}`, {
-        method,
-        headers: { "Content-Type": "application/json", apikey: cfg.apiKey },
-        body: body ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
-      })
-      if (!res.ok) {
-        const text = await res.text().catch(() => "")
-        throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`)
-      }
-      return res.json()
-    } finally {
-      clearTimeout(timer)
-    }
-  }
-
   function applyConnectionState(state: string, quiet = false) {
     const normalized = String(state || "").toLowerCase()
     if (normalized === "open") {
@@ -154,7 +126,7 @@ export default function AnnouncementsPage() {
 
   async function fetchConnectionState(quiet = false): Promise<string> {
     try {
-      const data = await api("GET", `/instance/connectionState/${encodeURIComponent(getConfig().instanceName)}`)
+      const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/state`)
       applyConnectionState(data?.instance?.state, quiet)
       return data?.instance?.state || "unknown"
     } catch (err) {
@@ -172,13 +144,13 @@ export default function AnnouncementsPage() {
   async function pollConnectionState() {
     pollAttemptsRef.current += 1
     if (pollAttemptsRef.current > 30) {
-      log('Polling timed out after ~60s.')
+      log("Polling timed out after ~60s.")
       setQrCode(null)
       setStatus('QR may have expired. Click "Get QR Code" for a fresh one.', true)
       return
     }
     try {
-      const data = await api("GET", `/instance/connectionState/${encodeURIComponent(getConfig().instanceName)}`)
+      const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/state`)
       const state: string = data.instance.state
       if (state === "open") {
         applyConnectionState("open")
@@ -206,11 +178,10 @@ export default function AnnouncementsPage() {
 
   async function onCheckServer() {
     try {
-      saveConfig()
       setIsRunning(true)
       setStatus("Checking server...")
       log("Checking server connection...")
-      const data = await api("GET", "/")
+      const data = await api("GET", "/api/whatsapp/status")
       log(`Server OK - ${data.message} (v${data.version})`)
       setStatus("Server reachable.")
     } catch (err) {
@@ -223,14 +194,10 @@ export default function AnnouncementsPage() {
 
   async function onCreateInstance() {
     try {
-      saveConfig()
       setIsRunning(true)
       log("Creating instance...")
-      const data = await api("POST", "/instance/create", {
-        instanceName: getConfig().instanceName,
-        integration: "WHATSAPP-BAILEYS",
-      })
-      log(`Instance created: ${data.instance.instanceName}`)
+      await api("POST", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME })
+      log("Instance created.")
       setStatus('Instance created. Click "Get QR Code".')
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown"
@@ -247,7 +214,6 @@ export default function AnnouncementsPage() {
 
   async function onConnect() {
     try {
-      saveConfig()
       setIsRunning(true)
       setStatus("Checking existing connection...")
       const current = await fetchConnectionState(true)
@@ -257,25 +223,13 @@ export default function AnnouncementsPage() {
         return
       }
       log("Ensuring instance exists...")
-      try {
-        await api("POST", "/instance/create", {
-          instanceName: getConfig().instanceName,
-          integration: "WHATSAPP-BAILEYS",
-        })
-        log("Instance created.")
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : ""
-        if (msg.includes("400") || msg.toLowerCase().includes("already")) {
-          log("Instance already exists. Reusing it.")
-        } else {
-          throw err
-        }
-      }
+      await api("POST", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME })
+      log("Instance exists.")
       setStatus("Requesting QR / reconnect...")
-      log("Requesting QR from existing instance...")
+      log("Requesting QR from instance...")
       for (let attempt = 1; attempt <= 5; attempt++) {
         log(`Connect attempt ${attempt}/5...`)
-        const data = await api("GET", `/instance/connect/${encodeURIComponent(getConfig().instanceName)}`)
+        const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/connect`)
         if (data.base64) {
           setQrCode(data.base64)
           log("QR code received.")
@@ -291,10 +245,6 @@ export default function AnnouncementsPage() {
         log("No QR in response yet. Retrying...")
         await new Promise((r) => setTimeout(r, 3000))
       }
-      try {
-        const stateData = await api("GET", `/instance/connectionState/${encodeURIComponent(getConfig().instanceName)}`)
-        log(`Final state: ${stateData.instance.state}`)
-      } catch {}
       setStatus("Could not get QR after 5 attempts. Check server logs.", true)
     } catch (err) {
       log(`ERROR: ${err instanceof Error ? err.message : "Unknown"}`)
@@ -306,10 +256,9 @@ export default function AnnouncementsPage() {
 
   async function onLogout() {
     try {
-      saveConfig()
       setIsRunning(true)
       log("Logging out instance...")
-      await api("DELETE", `/instance/logout/${encodeURIComponent(getConfig().instanceName)}`)
+      await api("DELETE", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME })
       log("Instance logged out.")
       setConnectionState("close")
       setQrCode(null)
@@ -322,7 +271,6 @@ export default function AnnouncementsPage() {
   }
 
   async function onCheckState() {
-    saveConfig()
     await fetchConnectionState()
   }
 
@@ -419,7 +367,7 @@ export default function AnnouncementsPage() {
       let validPhoneSet = new Set(allRecipients.map((r) => r.phone))
       try {
         log(`Validating ${allRecipients.length} contact(s)...`)
-        const validation = await api("POST", `/chat/whatsappNumbers/${encodeURIComponent(getConfig().instanceName)}`, {
+        const validation = await api("POST", `/api/whatsapp/instance/${INSTANCE_NAME}/validate`, {
           numbers: allRecipients.map((r) => r.phone),
         })
         validPhoneSet = new Set(
@@ -450,7 +398,7 @@ export default function AnnouncementsPage() {
         }
         const text = textLines.join("\n")
         try {
-          await api("POST", `/message/sendText/${encodeURIComponent(getConfig().instanceName)}`, {
+          await api("POST", `/api/whatsapp/instance/${INSTANCE_NAME}/send`, {
             number: recipient.phone,
             text,
             delay: 1200,
@@ -485,9 +433,9 @@ export default function AnnouncementsPage() {
 
   useEffect(() => {
     log("Announcements ready.")
-    log('Step 1: Fill server config, click "Check Server"')
-    log("Step 2: Create Instance")
-    log('Step 3: Get QR Code and scan with WhatsApp')
+    log('Step 1: Click "Check Server"')
+    log('Step 2: Click "Create Instance"')
+    log('Step 3: Click "Get QR Code" and scan with WhatsApp')
     log("Step 4: Select audience, review contacts, and send")
     loadAudienceGroups()
     const params = new URLSearchParams(window.location.search)
@@ -527,27 +475,6 @@ export default function AnnouncementsPage() {
           >
             {connectionState === "open" ? "Connected" : connectionState === "connecting" ? "Connecting..." : "Disconnected"}
           </span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <input
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            placeholder="Server URL"
-            value={baseUrl}
-            onChange={(e) => { setBaseUrl(e.target.value); saveConfig() }}
-          />
-          <input
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            placeholder="Instance Name"
-            value={instanceName}
-            onChange={(e) => { setInstanceName(e.target.value); saveConfig() }}
-          />
-          <input
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            type="password"
-            placeholder="API Key"
-            value={apiKey}
-            onChange={(e) => { setApiKey(e.target.value); saveConfig() }}
-          />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={onCheckServer} disabled={isRunning} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
