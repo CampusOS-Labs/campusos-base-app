@@ -17,6 +17,7 @@ export async function GET(
         invoiceNumber: invoice.invoiceNumber,
         academicYear: invoice.academicYear,
         dueDate: invoice.dueDate,
+        status: invoice.status,
         student: invoice.student,
         parent: invoice.parent,
         totalAmount: invoice.totalAmount,
