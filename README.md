@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CampusOS Base App
 
-## Getting Started
+**Multi-tenant SaaS base for school fee collection and communication.**
 
-First, run the development server:
+Built on Next.js 16, this is a foundation app that schools can fork and customise. Each fork is full-stack — own API routes, own database, own authentication.
+
+## Features
+
+- **Authentication** — Email/password + optional Google OAuth via Better Auth. Session-protected routes with login page.
+- **Fee Dashboard** — Invoice table with status tracking, payment links, and "remind to pay" flow.
+- **WhatsApp Announcements** — Compose and send bulk WhatsApp messages to parents. Uses Evolution API for WhatsApp connectivity (QR code pairing, message sending, phone number validation).
+- **Public Payment Page** — `/pay/[invoiceId]` — parents can pay fees via Razorpay Checkout without logging in. Signature-verified payment flow.
+- **Razorpay Integration** — Order creation, payment verification, webhook handling with HMAC signature validation.
+- **REST API Routes** — All features exposed via Next.js API routes (invoices, payments, webhooks, WhatsApp proxy).
+
+## Tech Stack
+
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 16.2.7 (App Router, Turbopack) |
+| Language | TypeScript |
+| Styling | Tailwind CSS v4 + shadcn/ui |
+| Auth | Better Auth (email/password, Google OAuth) |
+| Database | PostgreSQL via Supabase + Drizzle ORM |
+| Payments | Razorpay SDK |
+| WhatsApp | Evolution API (Baileys) — separate Docker service |
+| Validation | Zod v4 |
+| Linting | oxlint / oxfmt |
+
+## Quick Start
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+For WhatsApp announcements, you also need Evolution API running locally — see `INSTRUCTION.md`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Project Structure
 
-## Learn More
+```
+app/
+├── (protected)/          # Auth-required pages (sidebar layout)
+│   ├── home/             # Dashboard
+│   ├── payments/         # Fee tracking
+│   ├── announcements/    # WhatsApp sender
+│   └── logs/             # Activity log (placeholder)
+├── api/
+│   ├── auth/             # Better Auth endpoint
+│   ├── invoices/         # Invoice CRUD
+│   ├── payments/         # Razorpay order/verify
+│   ├── webhooks/         # Razorpay event webhook
+│   └── whatsapp/         # Evolution API proxy
+├── login/                # Auth page
+├── pay/[invoiceId]/      # Public payment page
+├── layout.tsx
+└── page.tsx
 
-To learn more about Next.js, take a look at the following resources:
+lib/
+├── services/
+│   ├── invoices.ts       # File-based invoice storage (swap point for DB)
+│   ├── payment.ts        # Razorpay helpers
+│   ├── webhook.ts        # HMAC signature verification
+│   └── whatsapp.ts       # Evolution API HTTP client
+├── db/                   # Drizzle schema + Postgres client
+├── auth.ts               # Better Auth server config
+└── auth-client.ts        # Better Auth client config
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+data/invoices/            # Sample invoice JSON files
+components/               # UI components (shadcn + app shell)
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment
 
-## Deploy on Vercel
+- **Recommended:** VPS with `next start` (persistent process for long-running needs)
+- **Also works:** Vercel (serverless) — WhatsApp features require a separate Evolution API instance
+- Each school fork gets its own deployment with isolated DB and API keys
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Environment Variables
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Copy `.env.example` to `.env` and fill in. Required:
+- Better Auth secret
+- Supabase Postgres URL
+- Razorpay test/live keys
+- Evolution API URL + API key (for WhatsApp)
+
+## License
+
+MIT
