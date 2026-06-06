@@ -2,7 +2,7 @@
   "invoiceNumber": "INV-2024-001",
   "academicYear": "2024-25",
   "dueDate": "2024-07-31",
-  "status": "pending",
+  "status": "paid",
   "totalAmount": 23000,
   "student": {
     "id": "STU-101",
@@ -15,5 +15,12 @@
     "name": "Nilesh Ghadepatil",
     "phone": "+91-7038667755",
     "email": "nilesh.ghadepatil@email.com"
+  },
+  "paymentDetails": {
+    "razorpayOrderId": "order_SyUaQ8iJzrdcij",
+    "razorpayPaymentId": "pay_SyUb4TWMd4SKDG",
+    "method": "card",
+    "paidAt": "2026-06-06T21:23:22.445Z",
+    "updatedAt": "2026-06-06T21:23:22.445Z"
   }
 }
