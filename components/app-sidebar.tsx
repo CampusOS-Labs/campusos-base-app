@@ -24,6 +24,7 @@ import {
 const nav = [
   { title: "Home", href: "/home" },
   { title: "Payments", href: "/payments" },
+  { title: "Announcements", href: "/announcements" },
   { title: "Logs", href: "/logs" },
 ] as const;
 
@@ -112,7 +113,7 @@ export function AppSidebar({ className, ...props }: React.ComponentProps<typeof 
               <SidebarMenuButton
                 isActive={pathname === item.href}
                 render={<Link href={item.href} />}
-                className="pl-4 data-active:!bg-[#BEBEBE] data-active:!text-white data-active:font-semibold data-active:hover:!bg-[#BEBEBE]/90 data-active:hover:!text-white"
+                className="pl-4 data-active:!bg-black data-active:!text-white data-active:font-semibold data-active:hover:!bg-black/90 data-active:hover:!text-white"
               >
                 {item.title}
               </SidebarMenuButton>
