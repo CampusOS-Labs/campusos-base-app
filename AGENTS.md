@@ -5,6 +5,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 <!-- END:nextjs-agent-rules -->
 
 <!-- BEGIN:announcements -->
+Please use exa mcp to read latest docs before making any code changes, fall back to default web search if exa mcp is not available.
+
+Always use subagents to parallelize work and get better results.
+
 ## WhatsApp Announcements
 
 Before modifying or debugging the announcements feature (`/announcements`, `/api/whatsapp/*`), read `INSTRUCTION.md` for the local setup guide covering Evolution API, Docker Compose setup, and the end-to-end test flow.
