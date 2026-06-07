@@ -1,6 +1,11 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { Card, CardContent } from "@/components/ui/card"
+import { WhatsAppPanel } from "./components/whatsapp-panel"
+import { ComposeForm } from "./components/compose-form"
+import { RecipientSelector } from "./components/recipient-selector"
+import { SendStatus } from "./components/send-status"
 
 type Invoice = {
   invoiceNumber: string
@@ -45,6 +50,33 @@ function normalizePhone(value: string): string {
   return String(value || "").replace(/[^\d]/g, "")
 }
 
+function toQrSrc(value: unknown): string | null {
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (trimmed.startsWith("data:image/")) return trimmed
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed
+  if (/^[A-Za-z0-9+/=\n\r]+$/.test(trimmed) && trimmed.length >= 64) {
+    return `data:image/png;base64,${trimmed.replace(/[\n\r]/g, "")}`
+  }
+  return null
+}
+
+function extractPairingCode(value: unknown): string | null {
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (!/^[A-Z0-9-]{6,16}$/i.test(trimmed)) return null
+  return trimmed.toUpperCase()
+}
+
+function parseConnectPayload(data: any): { qr: string | null; pairingCode: string | null; state: string } {
+  const qr = toQrSrc(data?.qr ?? data?.base64 ?? data?.qrcode?.base64 ?? data?.qrcode)
+  const pairingCode = extractPairingCode(data?.pairingCode ?? data?.code)
+  const state = String(data?.instance?.state || data?.state || "").toLowerCase()
+  return { qr, pairingCode, state }
+}
+
 function paymentLinkForInvoice(invoiceId: string): string {
   return `${window.location.origin}/pay/${invoiceId}`
 }
@@ -65,7 +97,7 @@ async function api(method: string, path: string, body?: unknown) {
     })
     if (!res.ok) {
       const text = await res.text().catch(() => "")
-      throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`)
+      throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
     }
     return res.json()
   } finally {
@@ -87,55 +119,34 @@ export default function AnnouncementsPage() {
   const [title, setTitle] = useState("")
   const [message, setMessage] = useState("")
   const [annType, setAnnType] = useState("update")
-  const [manualContacts, setManualContacts] = useState(["", "", "", ""])
+  const [manualContacts, setManualContacts] = useState<string[]>([""])
   const [statusSummary, setStatusSummary] = useState("Ready.")
   const [statusIsError, setStatusIsError] = useState(false)
-  const [logLines, setLogLines] = useState<string[]>([])
   const [sending, setSending] = useState(false)
-  const logRef = useRef<HTMLPreElement>(null)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pollAttemptsRef = useRef(0)
-
-  function log(msg: string) {
-    setLogLines((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`])
-  }
-
-  useEffect(() => {
-    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
-  }, [logLines])
 
   function setStatus(msg: string, isError = false) {
     setStatusSummary(msg)
     setStatusIsError(isError)
   }
 
-  function applyConnectionState(state: string, quiet = false) {
+  function applyConnectionState(state: string) {
     const normalized = String(state || "").toLowerCase()
     if (normalized === "open") {
       setConnectionState("open")
       setQrCode(null)
       setPairingCode(null)
       setStatus("WhatsApp connected.")
-      if (!quiet) log("Connection state: open")
     } else if (normalized === "connecting") {
       setConnectionState("connecting")
-      setStatus("Instance is connecting. Scan QR if prompted.")
-      if (!quiet) log("Connection state: connecting")
+      setStatus("Connecting to WhatsApp...")
+    } else if (normalized === "unknown") {
+      setConnectionState("unknown")
+      setStatus("Unable to confirm connection. Retrying...")
     } else {
       setConnectionState("close")
-      setStatus("Instance is disconnected.")
-      if (!quiet) log(`Connection state: ${normalized || "unknown"}`)
-    }
-  }
-
-  async function fetchConnectionState(quiet = false): Promise<string> {
-    try {
-      const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/state`)
-      applyConnectionState(data?.instance?.state, quiet)
-      return data?.instance?.state || "unknown"
-    } catch (err) {
-      if (!quiet) log(`ERROR: ${err instanceof Error ? err.message : "Unknown"}`)
-      return "unknown"
+      setStatus("WhatsApp disconnected.")
     }
   }
 
@@ -147,20 +158,19 @@ export default function AnnouncementsPage() {
       if (state === "open") {
         setConnectionState("open")
         setStatus("WhatsApp connected.")
-        log("Already connected — no QR scan needed.")
       } else if (state === "connecting" || state === "syncing") {
         setConnectionState("connecting")
-        setStatus("Auto-reconnecting...")
-        log("Instance is reconnecting. Waiting a few seconds...")
-        setTimeout(() => {
-          setConnectionState((prev) => prev === "connecting" ? "close" : prev)
-        }, 8000)
+        setStatus("Connecting to WhatsApp...")
+        startPolling()
+      } else if (state === "unknown") {
+        setConnectionState("unknown")
+        setStatus("Unable to confirm connection. Retrying...")
+        startPolling()
       } else {
         setConnectionState("close")
-        setStatus("Instance disconnected. Use QR or Pairing Code to connect.")
+        setStatus("WhatsApp disconnected.")
       }
-    } catch (err) {
-      log(`Initial state check failed: ${err instanceof Error ? err.message : "Unknown"}`)
+    } catch {
       setConnectionState("close")
     }
   }
@@ -174,32 +184,36 @@ export default function AnnouncementsPage() {
   async function pollConnectionState() {
     pollAttemptsRef.current += 1
     if (pollAttemptsRef.current > 30) {
-      log("Polling timed out after ~60s.")
       setQrCode(null)
       setPairingCode(null)
       setConnectionState("close")
-      setStatus("Code or QR may have expired. Try again.", true)
+      setStatus("Connection expired. Try again.", true)
       return
     }
     try {
       const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/state`)
-      const state: string = data.instance.state
+      const state: string = data?.instance?.state || data?.state || "unknown"
       if (state === "open") {
         applyConnectionState("open")
-        log("Successfully connected to WhatsApp.")
         return
       }
       if (state === "close") {
+        if (pollAttemptsRef.current < 5) {
+          pollRef.current = setTimeout(pollConnectionState, 2500)
+          return
+        }
         setQrCode(null)
         setPairingCode(null)
         setConnectionState("close")
-        setStatus("Connection closed. Try again.", true)
+        setStatus("Connection expired. Try again.", true)
         return
       }
-      log(`Connecting... (${Math.round(pollAttemptsRef.current * 2)}s elapsed)`)
+      if (state === "unknown") {
+        pollRef.current = setTimeout(pollConnectionState, 3000)
+        return
+      }
       pollRef.current = setTimeout(pollConnectionState, 2000)
-    } catch (err) {
-      log(`State check: ${err instanceof Error ? err.message : "Unknown"}`)
+    } catch {
       pollRef.current = setTimeout(pollConnectionState, 3000)
     }
   }
@@ -210,105 +224,91 @@ export default function AnnouncementsPage() {
     }
   }, [])
 
-  async function onCheckServer() {
-    try {
-      setIsRunning(true)
-      setStatus("Checking server...")
-      log("Checking server connection...")
-      const data = await api("GET", "/api/whatsapp/status")
-      log(`Server OK - ${data.message} (v${data.version})`)
-      setStatus("Server reachable.")
-    } catch (err) {
-      log(`ERROR: ${err instanceof Error ? err.message : "Unknown"}`)
-      setStatus("Could not reach server.", true)
-    } finally {
-      setIsRunning(false)
-    }
-  }
-
-  async function onCreateInstance() {
-    try {
-      setIsRunning(true)
-      log("Creating instance...")
-      await api("POST", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME })
-      log("Instance created.")
-      setStatus('Instance created. Click "Get QR Code".')
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown"
-      log(`ERROR: ${msg}`)
-      if (msg.includes("400") || msg.includes("already")) {
-        setStatus('Instance may already exist. Try "Get QR Code".')
-      } else {
-        setStatus("Instance creation failed.", true)
-      }
-    } finally {
-      setIsRunning(false)
-    }
-  }
-
   async function onConnect() {
     try {
       setIsRunning(true)
+      await api("POST", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME }).catch(() => {})
       const stateData = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/state`)
-      const state = stateData?.instance?.state || ""
+      const state = stateData?.instance?.state || stateData?.state || ""
       if (state === "open") {
         applyConnectionState("open")
-        log("Already connected.")
         return
       }
-      setStatus("Requesting QR...")
-      for (let attempt = 1; attempt <= 5; attempt++) {
-        log(`Connect attempt ${attempt}/5...`)
-        const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/connect`)
-        if (data.base64) {
-          setQrCode(data.base64)
-          setPairingCode(null)
-          log("QR code received.")
-          setStatus("Scan the QR code with WhatsApp -> Linked Devices.")
-          startPolling()
-          return
-        }
-        if (data?.instance?.state === "open") {
-          applyConnectionState("open")
-          log("Connected.")
-          return
-        }
-        log("No QR in response yet. Retrying...")
-        await new Promise((r) => setTimeout(r, 2000 * attempt))
+      const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/connect`)
+      const connectPayload = parseConnectPayload(data)
+      if (connectPayload.qr) {
+        setQrCode(connectPayload.qr)
+        setPairingCode(null)
+        setConnectionState("connecting")
+        setStatus("Scan the QR code with WhatsApp → Linked Devices.")
+        startPolling()
+        return
       }
-      setStatus("Could not get QR after 5 attempts. Check server logs.", true)
-    } catch (err) {
-      log(`ERROR: ${err instanceof Error ? err.message : "Unknown"}`)
-      setStatus("Failed to get QR code.", true)
+
+      if (connectPayload.pairingCode) {
+        setPairingCode(connectPayload.pairingCode)
+        setQrCode(null)
+        setConnectionState("connecting")
+        setStatus('Enter the code in WhatsApp → Linked Devices → "Pair with code instead"')
+        startPolling()
+        return
+      }
+
+      if (connectPayload.state === "open") {
+        applyConnectionState("open")
+        return
+      }
+
+      if (connectPayload.state === "connecting" || connectPayload.state === "syncing") {
+        setConnectionState("connecting")
+        setStatus("Connecting to WhatsApp...")
+        startPolling()
+        return
+      }
+
+      setStatus("Could not start WhatsApp connection. Try again.", true)
+    } catch {
+      setStatus("Failed to start WhatsApp connection. Try again.", true)
     } finally {
       setIsRunning(false)
     }
   }
 
   async function onGetPairingCode() {
-    const phone = pairingPhone.trim()
+    const phone = normalizePhone(pairingPhone)
+    setPairingPhone(phone)
     if (!phone) {
-      setStatus("Enter a phone number.", true)
+      setStatus("Enter a phone number with country code.", true)
+      return
+    }
+    if (phone.length < 10 || phone.length > 15) {
+      setStatus("Phone must include country code (10-15 digits).", true)
       return
     }
     try {
       setIsRunning(true)
       await api("POST", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME }).catch(() => {})
       const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/connect?number=${encodeURIComponent(phone)}`)
-      if (data.code) {
-        setPairingCode(data.code)
+      const connectPayload = parseConnectPayload(data)
+      if (connectPayload.pairingCode) {
+        setPairingCode(connectPayload.pairingCode)
         setQrCode(null)
-        log(`Pairing code received: ${data.code}`)
-        setStatus('Open WhatsApp → Linked Devices → "Pair with code instead"')
+        setConnectionState("connecting")
+        setStatus('Enter the code in WhatsApp → Linked Devices → "Pair with code instead"')
         startPolling()
-      } else if (data?.instance?.state === "open") {
+      } else if (connectPayload.qr) {
+        setQrCode(connectPayload.qr)
+        setPairingCode(null)
+        setConnectionState("connecting")
+        setStatus("Scan the QR code with WhatsApp → Linked Devices.")
+        startPolling()
+      } else if (connectPayload.state === "open") {
         applyConnectionState("open")
       } else {
         setStatus("Failed to get pairing code.", true)
       }
-    } catch (err) {
-      log(`ERROR: ${err instanceof Error ? err.message : "Unknown"}`)
-      setStatus("Failed to get pairing code.", true)
+    } catch {
+      setStatus("Failed to get pairing code. Try again.", true)
     } finally {
       setIsRunning(false)
     }
@@ -317,43 +317,48 @@ export default function AnnouncementsPage() {
   async function onLogout() {
     try {
       setIsRunning(true)
-      log("Logging out instance...")
       await api("DELETE", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME })
-      log("Instance logged out.")
       setConnectionState("close")
       setQrCode(null)
       setPairingCode(null)
-      setStatus('Instance logged out. Click "Get QR Code" to reconnect.')
-    } catch (err) {
-      log(`Logout error: ${err instanceof Error ? err.message : "Unknown"}`)
+      setStatus("WhatsApp disconnected.")
+    } catch {
+      // silently fail
     } finally {
       setIsRunning(false)
     }
-  }
-
-  async function onCheckState() {
-    await fetchConnectionState()
-  }
-
-  function fillContacts(recipients: Recipient[]) {
-    const phones = recipients.slice(0, 4).map((r) => `+${r.phone}`)
-    const next = [...manualContacts]
-    for (let i = 0; i < 4; i++) next[i] = phones[i] || ""
-    setManualContacts(next)
   }
 
   function handleAudienceChange(id: string) {
     setSelectedAudience(id)
     const recipients = recipientsByAudience.get(id) || []
     setGroupRecipients(recipients)
-    fillContacts(recipients)
+  }
+
+  function handleManualContactChange(index: number, value: string) {
+    setManualContacts((prev) => {
+      const next = [...prev]
+      next[index] = value
+      return next
+    })
+  }
+
+  function handleAddContact() {
+    setManualContacts((prev) => [...prev, ""])
+  }
+
+  function handleRemoveContact(index: number) {
+    setManualContacts((prev) => {
+      if (prev.length <= 1) return prev
+      return prev.filter((_, i) => i !== index)
+    })
   }
 
   async function loadAudienceGroups() {
     try {
       const res = await fetch("/api/invoices")
       const json = await res.json()
-      if (!json.success) throw new Error(json.error || "Failed to fetch invoices")
+      if (!json.success) throw new Error()
       const invoices: Invoice[] = json.data
       const parentsMap = new Map<string, Recipient>()
       for (const invoice of invoices) {
@@ -375,27 +380,27 @@ export default function AnnouncementsPage() {
         .map((r) => ({ ...r, invoices: r.invoices.filter((i) => i.status === "pending") }))
         .filter((r) => r.invoices.length > 0)
       const groups: AudienceGroup[] = [
-        { id: "unpaid-parents", label: `Unpaid Parents (${unpaidParents.length})`, help: "Auto-group from pending invoices. Includes unique payment link(s).", recipients: unpaidParents },
-        { id: "all-parents", label: `All Parents (${allParents.length})`, help: "All parents found in invoice records.", recipients: allParents },
+        { id: "unpaid-parents", label: `Unpaid Parents (${unpaidParents.length})`, help: "Parents with pending invoices. Includes payment links.", recipients: unpaidParents },
+        { id: "all-parents", label: `All Parents (${allParents.length})`, help: "All parents in the system.", recipients: allParents },
       ]
       setAudienceGroups(groups)
       const map = new Map(groups.map((g) => [g.id, g.recipients]))
       setRecipientsByAudience(map)
       if (groups.length > 0) {
         setSelectedAudience(groups[0].id)
-        fillContacts(groups[0].recipients)
         setGroupRecipients(groups[0].recipients)
       }
-      log(`Audience groups loaded: ${groups.map((g) => `${g.id}=${g.recipients.length}`).join(", ")}`)
-    } catch (err) {
-      setStatus("Could not load invoice groups.", true)
-      log(`Audience groups unavailable: ${err instanceof Error ? err.message : "Unknown"}`)
+    } catch {
+      setStatus("Could not load contact groups.", true)
     }
   }
 
   async function onSend() {
     if (!connectionState || connectionState !== "open") {
-      await fetchConnectionState()
+      try {
+        const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/state`)
+        applyConnectionState(data?.instance?.state)
+      } catch {}
     }
     if (connectionState !== "open") {
       setStatus("WhatsApp is not connected. Connect first.", true)
@@ -427,7 +432,6 @@ export default function AnnouncementsPage() {
     try {
       let validPhoneSet = new Set(allRecipients.map((r) => r.phone))
       try {
-        log(`Validating ${allRecipients.length} contact(s)...`)
         const validation = await api("POST", `/api/whatsapp/instance/${INSTANCE_NAME}/validate`, {
           numbers: allRecipients.map((r) => r.phone),
         })
@@ -436,20 +440,17 @@ export default function AnnouncementsPage() {
             .filter((item: { exists: boolean }) => item.exists)
             .map((item: { number: string }) => normalizePhone(item.number))
         )
-        log(`Valid: ${validPhoneSet.size}, Invalid: ${allRecipients.length - validPhoneSet.size}`)
-      } catch (err) {
-        log(`Validation skipped: ${err instanceof Error ? err.message : "Unknown"}. Sending to all.`)
-      }
+      } catch {}
       const recipientsToSend = allRecipients.filter((r) => validPhoneSet.has(r.phone))
       if (recipientsToSend.length === 0) {
-        setStatus("No valid contacts found.", true)
+        setStatus("No valid WhatsApp numbers found.", true)
         setSending(false)
         return
       }
-      const results: Array<{ phone: string; ok: boolean; error?: string }> = []
+      const results: Array<{ phone: string; ok: boolean }> = []
       for (let index = 0; index < recipientsToSend.length; index++) {
         const recipient = recipientsToSend[index]
-        log(`Sending (${index + 1}/${recipientsToSend.length}) -> ${recipient.phone}`)
+        setStatus(`Sending ${index + 1} of ${recipientsToSend.length}...`)
         const textLines = [`[${typeLabel}] ${titleTrimmed}`, "", messageTrimmed]
         if (recipient.invoices.length > 0) {
           textLines.push("", "Pending payment link(s):")
@@ -465,28 +466,22 @@ export default function AnnouncementsPage() {
             delay: 1200,
           })
           results.push({ phone: recipient.phone, ok: true })
-          log(`Sent to ${recipient.phone}`)
-        } catch (err) {
-          results.push({ phone: recipient.phone, ok: false, error: err instanceof Error ? err.message : "Unknown" })
-          log(`Failed ${recipient.phone}: ${err instanceof Error ? err.message : "Unknown"}`)
+        } catch {
+          results.push({ phone: recipient.phone, ok: false })
         }
         if (index < recipientsToSend.length - 1) {
-          const wait = randomDelay(4000, 9000)
-          log(`Waiting ${wait}ms...`)
-          await new Promise((r) => setTimeout(r, wait))
+          await new Promise((r) => setTimeout(r, randomDelay(4000, 9000)))
         }
       }
       const sentCount = results.filter((r) => r.ok).length
       const failedCount = results.length - sentCount
-      setStatus(`Done. Sent: ${sentCount}, Failed: ${failedCount}`)
       if (failedCount > 0) {
-        log("Failed:")
-        results.filter((r) => !r.ok).forEach((r) => log(`  - ${r.phone}: ${r.error}`))
+        setStatus(`Sent to ${sentCount} contact(s). ${failedCount} failed.`, true)
+      } else {
+        setStatus(`Sent to ${sentCount} contact(s).`)
       }
-      log(`Summary: ${sentCount} sent, ${failedCount} failed`)
-    } catch (err) {
-      setStatus(`Send error: ${err instanceof Error ? err.message : "Unknown"}`, true)
-      log(`ERROR: ${err instanceof Error ? err.message : "Unknown"}`)
+    } catch {
+      setStatus("Something went wrong while sending.", true)
     } finally {
       setSending(false)
     }
@@ -511,202 +506,61 @@ export default function AnnouncementsPage() {
   }, [recipientsByAudience]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Announcements</h1>
-        <p className="text-sm text-muted-foreground mt-1">Compose a new update or browse what you&apos;ve sent.</p>
-      </div>
-
-      <div className="rounded-md border p-4 space-y-3" id="wa-panel">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold">WhatsApp Connection</h3>
-          <span
-            className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-              connectionState === "open"
-                ? "bg-green-100 text-green-800"
-                : connectionState === "connecting"
-                  ? "bg-yellow-100 text-yellow-800"
-                  : "bg-gray-100 text-gray-800"
-            }`}
-          >
-            {connectionState === "open" ? "Connected" : connectionState === "connecting" ? "Reconnecting..." : "Disconnected"}
-          </span>
+    <div className="flex justify-center pt-6 pb-12">
+      <div className="w-full max-w-xl space-y-4">
+        <div>
+          <h1 className="text-2xl font-semibold">New Announcement</h1>
+          <p className="text-sm text-muted-foreground mt-1">Send a WhatsApp message to parents.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button onClick={onCheckServer} disabled={isRunning} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
-            1. Check Server
-          </button>
-          <button onClick={onCreateInstance} disabled={isRunning} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
-            2. Create Instance
-          </button>
-          <button onClick={onCheckState} disabled={isRunning} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
-            State
-          </button>
-          <button onClick={onLogout} disabled={isRunning} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 text-orange-600 border-orange-200 hover:bg-orange-50">
-            Logout
-          </button>
-        </div>
-        {connectionState === "close" && (
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-1">
-              <button
-                onClick={() => setConnectMode("qr")}
-                className={`inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors h-8 px-3 border ${
-                  connectMode === "qr"
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background border-input hover:bg-accent"
-                }`}
-              >
-                QR Code
-              </button>
-              <button
-                onClick={() => setConnectMode("code")}
-                className={`inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors h-8 px-3 border ${
-                  connectMode === "code"
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background border-input hover:bg-accent"
-                }`}
-              >
-                Pairing Code
-              </button>
-            </div>
-            {connectMode === "qr" ? (
-              <div className="space-y-2">
-                <button onClick={onConnect} disabled={isRunning} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
-                  Get QR Code
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <input
-                    placeholder="Phone (e.g. 919876543210)"
-                    value={pairingPhone}
-                    onChange={(e) => setPairingPhone(e.target.value)}
-                    className="flex h-9 w-full max-w-xs rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  />
-                  <button onClick={onGetPairingCode} disabled={isRunning} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
-                    Get Code
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        {qrCode && (
-          <div className="flex flex-col items-center mt-2">
-            <img src={qrCode} className="w-44 h-44 border rounded-md" alt="QR Code" />
-            <p className="text-xs text-muted-foreground mt-1">Scan with WhatsApp &rarr; Linked Devices</p>
-          </div>
-        )}
-        {pairingCode && (
-          <div className="flex flex-col items-center mt-2">
-            <span className="text-2xl font-mono font-bold tracking-widest bg-muted px-6 py-3 rounded-md select-all">{pairingCode}</span>
-            <p className="text-xs text-muted-foreground mt-1">Open WhatsApp &rarr; Linked Devices &rarr; &ldquo;Pair with code instead&rdquo;</p>
-          </div>
-        )}
-      </div>
 
-      <div className="rounded-md border p-6 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="ann-title">Title</label>
-            <input
-              id="ann-title"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              placeholder="e.g. New feature rollout"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+        <WhatsAppPanel
+          connectionState={connectionState}
+          qrCode={qrCode}
+          pairingCode={pairingCode}
+          pairingPhone={pairingPhone}
+          connectMode={connectMode}
+          isRunning={isRunning}
+          onLogout={onLogout}
+          onConnect={onConnect}
+          onGetPairingCode={onGetPairingCode}
+          onPairingPhoneChange={setPairingPhone}
+          onConnectModeChange={setConnectMode}
+        />
+
+        <Card>
+          <CardContent className="space-y-5 pt-6">
+            <ComposeForm
+              title={title}
+              message={message}
+              annType={annType}
+              onTitleChange={setTitle}
+              onMessageChange={setMessage}
+              onAnnTypeChange={setAnnType}
             />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="ann-audience">Audience</label>
-            <select
-              id="ann-audience"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              value={selectedAudience}
-              onChange={(e) => handleAudienceChange(e.target.value)}
-            >
-              {audienceGroups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.label}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-muted-foreground">
-              {audienceGroups.find((g) => g.id === selectedAudience)?.help || "Groups are auto-created from invoices."}
-            </p>
-          </div>
-        </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Type</label>
-          <div className="flex flex-wrap gap-1">
-            {["update", "maintenance", "new", "alert"].map((type) => (
-              <button
-                key={type}
-                onClick={() => setAnnType(type)}
-                className={`inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors h-8 px-3 border ${
-                  annType === type
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background border-input hover:bg-accent"
-                }`}
-              >
-                {type.charAt(0).toUpperCase() + type.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
+            <hr className="border-t" />
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium" htmlFor="ann-message">Message</label>
-          <textarea
-            id="ann-message"
-            className="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            placeholder="Write your announcement..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-        </div>
+            <RecipientSelector
+              audienceGroups={audienceGroups}
+              selectedAudience={selectedAudience}
+              groupRecipients={groupRecipients}
+              manualContacts={manualContacts}
+              onAudienceChange={handleAudienceChange}
+              onManualContactChange={handleManualContactChange}
+              onAddContact={handleAddContact}
+              onRemoveContact={handleRemoveContact}
+            />
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Recipients (WhatsApp)</label>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {manualContacts.map((contact, i) => (
-              <input
-                key={i}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                placeholder={`+15551234567 (contact ${i + 1})`}
-                value={contact}
-                onChange={(e) => {
-                  const next = [...manualContacts]
-                  next[i] = e.target.value
-                  setManualContacts(next)
-                }}
-              />
-            ))}
-          </div>
-        </div>
+            <hr className="border-t" />
 
-        <div className="flex justify-end pt-4 border-t">
-          <button
-            onClick={onSend}
-            disabled={sending || isRunning}
-            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2"
-          >
-            {sending ? "Sending..." : "Send announcement"}
-          </button>
-        </div>
-
-        <div className="space-y-2 pt-2">
-          <div className={`text-sm font-semibold ${statusIsError ? "text-red-600" : ""}`}>{statusSummary}</div>
-          <pre
-            ref={logRef}
-            className="bg-muted/50 text-xs p-3 rounded-md max-h-48 overflow-auto whitespace-pre-wrap font-mono"
-          >
-            {logLines.join("\n") || " "}
-          </pre>
-        </div>
+            <SendStatus
+              statusSummary={statusSummary}
+              statusIsError={statusIsError}
+              sending={sending}
+              onSend={onSend}
+            />
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

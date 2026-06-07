@@ -93,8 +93,6 @@
     @apply font-sans;
     }
 
-  [data-sidebar="menu-button"]:hover,
-  [data-sidebar="menu-button"]:active,
   [data-sidebar="menu-button"][data-active="true"] {
     background-color: transparent;
   }

@@ -113,7 +113,13 @@ export function AppSidebar({ className, ...props }: React.ComponentProps<typeof 
               <SidebarMenuButton
                 isActive={pathname === item.href}
                 render={<Link href={item.href} />}
-                className="pl-4 data-active:!bg-black data-active:!text-white data-active:font-semibold data-active:hover:!bg-black/90 data-active:hover:!text-white"
+                className={cn(
+                  "pl-4 relative hover:bg-zinc-200",
+                  pathname === item.href && [
+                    "data-active:!bg-transparent data-active:!text-foreground data-active:font-semibold data-active:hover:!bg-transparent",
+                    "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:bg-foreground before:rounded-full",
+                  ],
+                )}
               >
                 {item.title}
               </SidebarMenuButton>

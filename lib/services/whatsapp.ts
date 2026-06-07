@@ -2,6 +2,18 @@ interface InstanceMeta {
   state: "open" | "connecting" | "close"
 }
 
+export class EvolutionHttpError extends Error {
+  status: number
+  payload: unknown
+
+  constructor(status: number, message: string, payload?: unknown) {
+    super(message)
+    this.name = "EvolutionHttpError"
+    this.status = status
+    this.payload = payload
+  }
+}
+
 const globalForWhatsApp = globalThis as typeof globalThis & {
   __whatsAppManager?: WhatsAppManager
 }
@@ -13,6 +25,58 @@ const config = {
 
 export class WhatsAppManager {
   private instances = new Map<string, InstanceMeta>()
+
+  private mapState(raw: unknown): "open" | "connecting" | "close" {
+    const normalized = String(raw || "").toLowerCase()
+    if (normalized === "open") return "open"
+    if (normalized === "connecting" || normalized === "syncing") return "connecting"
+    return "close"
+  }
+
+  private extractQr(data: any): string | null {
+    const candidates = [
+      data?.base64,
+      data?.qrcode?.base64,
+      data?.qr?.base64,
+      data?.qrcode,
+      data?.qr,
+    ]
+
+    for (const candidate of candidates) {
+      if (typeof candidate !== "string" || !candidate.trim()) continue
+      const value = candidate.trim()
+      if (value.startsWith("data:image/")) return value
+      if (value.startsWith("http://") || value.startsWith("https://")) return value
+      if (/^[A-Za-z0-9+/=\n\r]+$/.test(value) && value.length >= 64) {
+        const cleaned = value.replace(/[\n\r]/g, "")
+        return `data:image/png;base64,${cleaned}`
+      }
+    }
+
+    return null
+  }
+
+  private extractPairingCode(data: any): string | null {
+    const candidates = [data?.pairingCode, data?.pairing_code, data?.code]
+    for (const candidate of candidates) {
+      if (typeof candidate !== "string" || !candidate.trim()) continue
+      const value = candidate.trim()
+      if (/^[A-Z0-9-]{6,16}$/i.test(value)) return value.toUpperCase()
+    }
+    return null
+  }
+
+  private isAlreadyExistsError(error: unknown): boolean {
+    if (!(error instanceof EvolutionHttpError)) return false
+    if (![400, 403, 409].includes(error.status)) return false
+    const text = JSON.stringify(error.payload || error.message).toLowerCase()
+    return (
+      text.includes("already") ||
+      text.includes("in use") ||
+      text.includes("exists") ||
+      text.includes("name")
+    )
+  }
 
   private async api(method: string, path: string, body?: unknown): Promise<any> {
     const controller = new AbortController()
@@ -29,9 +93,25 @@ export class WhatsAppManager {
       })
       if (!res.ok) {
         const text = await res.text().catch(() => "")
-        throw new Error(`Evolution API HTTP ${res.status}: ${text.slice(0, 300)}`)
+        let payload: unknown = text
+        try {
+          payload = text ? JSON.parse(text) : null
+        } catch {
+          payload = text
+        }
+        throw new EvolutionHttpError(
+          res.status,
+          `Evolution API HTTP ${res.status}: ${text.slice(0, 300)}`,
+          payload,
+        )
       }
-      return res.json()
+      const text = await res.text().catch(() => "")
+      if (!text) return {}
+      try {
+        return JSON.parse(text)
+      } catch {
+        return { raw: text }
+      }
     } finally {
       clearTimeout(timer)
     }
@@ -46,8 +126,7 @@ export class WhatsAppManager {
         integration: "WHATSAPP-BAILEYS",
       })
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown"
-      if (!msg.includes("400")) throw err
+      if (!this.isAlreadyExistsError(err)) throw err
     }
 
     this.instances.set(name, { state: "close" })
@@ -57,20 +136,13 @@ export class WhatsAppManager {
     try {
       const data = await this.api("GET", `/instance/connectionState/${encodeURIComponent(name)}`)
       const raw = data?.instance?.state as string | undefined
-      let mappedState: "open" | "connecting" | "close"
-      if (raw === "open") {
-        mappedState = "open"
-      } else if (raw === "connecting" || raw === "syncing") {
-        mappedState = "connecting"
-      } else {
-        mappedState = "close"
-      }
+      const mappedState = this.mapState(raw)
       this.instances.set(name, { state: mappedState })
       return { state: mappedState, qr: null }
     } catch {
       const inst = this.instances.get(name)
       if (inst) return { state: inst.state, qr: null }
-      return { state: "close" }
+      return { state: "unknown" }
     }
   }
 
@@ -88,15 +160,15 @@ export class WhatsAppManager {
         "GET",
         `/instance/connect/${encodeURIComponent(name)}?number=${encodeURIComponent(phoneNumber)}`,
       )
-      const pairingCode = data.pairingCode || data.code
+      const pairingCode = this.extractPairingCode(data)
       if (!pairingCode) {
-        throw new Error("Evolution API returned no pairing code. This may be a known bug with this version.")
+        throw new Error("Evolution API returned no pairing code")
       }
       inst.state = "connecting"
       return { code: pairingCode, state: "connecting" }
     }
 
-    const delays = [1000, 2000, 4000]
+    const delays = [1000, 2000]
     for (let i = 0; i < 3; i++) {
       if (i > 0) await new Promise((r) => setTimeout(r, delays[i - 1]))
 
@@ -106,14 +178,22 @@ export class WhatsAppManager {
           `/instance/connect/${encodeURIComponent(name)}`,
         )
 
-        if (data?.base64) {
+        const qr = this.extractQr(data)
+        if (qr) {
           inst.state = "connecting"
-          return { base64: data.base64, state: "connecting" }
+          return { base64: qr, state: "connecting" }
+        }
+
+        const pairingCode = this.extractPairingCode(data)
+        if (pairingCode) {
+          inst.state = "connecting"
+          return { code: pairingCode, state: "connecting" }
         }
 
         const rawState = data?.instance?.state as string | undefined
-        if (rawState === "open") {
-          inst.state = "open"
+        const mappedState = this.mapState(rawState)
+        inst.state = mappedState
+        if (mappedState === "open") {
           return { state: "open" }
         }
       } catch {

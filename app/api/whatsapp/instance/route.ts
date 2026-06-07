@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { whatsAppManager } from "@/lib/services/whatsapp"
+import { EvolutionHttpError, whatsAppManager } from "@/lib/services/whatsapp"
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +15,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, instanceName })
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create instance"
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    const status = err instanceof EvolutionHttpError ? err.status : 500
+    return NextResponse.json({ success: false, error: message }, { status })
   }
 }
 
@@ -37,7 +38,8 @@ export async function GET(req: NextRequest) {
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to get state"
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    const status = err instanceof EvolutionHttpError ? err.status : 500
+    return NextResponse.json({ success: false, error: message }, { status })
   }
 }
 
@@ -54,6 +56,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to logout"
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    const status = err instanceof EvolutionHttpError ? err.status : 500
+    return NextResponse.json({ success: false, error: message }, { status })
   }
 }

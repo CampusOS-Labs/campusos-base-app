@@ -2,25 +2,18 @@
   "invoiceNumber": "INV-2025-1847",
   "academicYear": "2024-25",
   "dueDate": "2024-06-30",
-  "status": "paid",
+  "status": "pending",
   "totalAmount": 45000,
   "student": {
     "id": "STU-1847",
-    "name": "Aarav Sharma",
+    "name": "Atharva Deodhar",
     "class": "Class 8",
     "rollNumber": "08-23",
     "admissionNumber": "ADM-2021-1847"
   },
   "parent": {
-    "name": "Rajesh Sharma",
+    "name": "Anjali Deodhar",
     "phone": "+91-9970708106",
-    "email": "rajesh.sharma84@gmail.com"
-  },
-  "paymentDetails": {
-    "razorpayOrderId": "order_SyUcQ5XluM4wz0",
-    "razorpayPaymentId": "pay_SyUd070o9TRkB9",
-    "method": "card",
-    "paidAt": "2026-06-06T21:25:11.562Z",
-    "updatedAt": "2026-06-06T21:25:11.562Z"
+    "email": "anjali.deodhar84@gmail.com"
   }
 }
