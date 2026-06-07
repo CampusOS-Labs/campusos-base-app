@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
         { status: 400 },
       )
     }
-    const result = whatsAppManager.getState(name)
+    const result = await whatsAppManager.getState(name)
     return NextResponse.json({
       success: true,
       state: result.state,

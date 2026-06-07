@@ -76,6 +76,9 @@ async function api(method: string, path: string, body?: unknown) {
 export default function AnnouncementsPage() {
   const [connectionState, setConnectionState] = useState<ConnectionState>("unknown")
   const [qrCode, setQrCode] = useState<string | null>(null)
+  const [pairingCode, setPairingCode] = useState<string | null>(null)
+  const [pairingPhone, setPairingPhone] = useState("")
+  const [connectMode, setConnectMode] = useState<"qr" | "code">("qr")
   const [isRunning, setIsRunning] = useState(false)
   const [audienceGroups, setAudienceGroups] = useState<AudienceGroup[]>([])
   const [recipientsByAudience, setRecipientsByAudience] = useState<Map<string, Recipient[]>>(new Map())
@@ -111,6 +114,7 @@ export default function AnnouncementsPage() {
     if (normalized === "open") {
       setConnectionState("open")
       setQrCode(null)
+      setPairingCode(null)
       setStatus("WhatsApp connected.")
       if (!quiet) log("Connection state: open")
     } else if (normalized === "connecting") {
@@ -135,6 +139,32 @@ export default function AnnouncementsPage() {
     }
   }
 
+  async function checkInitialState() {
+    await api("POST", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME }).catch(() => {})
+    try {
+      const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/state`)
+      const state = data?.instance?.state || "close"
+      if (state === "open") {
+        setConnectionState("open")
+        setStatus("WhatsApp connected.")
+        log("Already connected — no QR scan needed.")
+      } else if (state === "connecting" || state === "syncing") {
+        setConnectionState("connecting")
+        setStatus("Auto-reconnecting...")
+        log("Instance is reconnecting. Waiting a few seconds...")
+        setTimeout(() => {
+          setConnectionState((prev) => prev === "connecting" ? "close" : prev)
+        }, 8000)
+      } else {
+        setConnectionState("close")
+        setStatus("Instance disconnected. Use QR or Pairing Code to connect.")
+      }
+    } catch (err) {
+      log(`Initial state check failed: ${err instanceof Error ? err.message : "Unknown"}`)
+      setConnectionState("close")
+    }
+  }
+
   function startPolling() {
     pollAttemptsRef.current = 0
     if (pollRef.current) clearTimeout(pollRef.current)
@@ -146,7 +176,9 @@ export default function AnnouncementsPage() {
     if (pollAttemptsRef.current > 30) {
       log("Polling timed out after ~60s.")
       setQrCode(null)
-      setStatus('QR may have expired. Click "Get QR Code" for a fresh one.', true)
+      setPairingCode(null)
+      setConnectionState("close")
+      setStatus("Code or QR may have expired. Try again.", true)
       return
     }
     try {
@@ -159,7 +191,9 @@ export default function AnnouncementsPage() {
       }
       if (state === "close") {
         setQrCode(null)
-        setStatus('Connection closed. Click "Get QR Code" again.', true)
+        setPairingCode(null)
+        setConnectionState("close")
+        setStatus("Connection closed. Try again.", true)
         return
       }
       log(`Connecting... (${Math.round(pollAttemptsRef.current * 2)}s elapsed)`)
@@ -215,40 +249,66 @@ export default function AnnouncementsPage() {
   async function onConnect() {
     try {
       setIsRunning(true)
-      setStatus("Checking existing connection...")
-      const current = await fetchConnectionState(true)
-      if (String(current).toLowerCase() === "open") {
+      const stateData = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/state`)
+      const state = stateData?.instance?.state || ""
+      if (state === "open") {
         applyConnectionState("open")
-        log("Already connected. No QR scan needed.")
+        log("Already connected.")
         return
       }
-      log("Ensuring instance exists...")
-      await api("POST", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME })
-      log("Instance exists.")
-      setStatus("Requesting QR / reconnect...")
-      log("Requesting QR from instance...")
+      setStatus("Requesting QR...")
       for (let attempt = 1; attempt <= 5; attempt++) {
         log(`Connect attempt ${attempt}/5...`)
         const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/connect`)
         if (data.base64) {
           setQrCode(data.base64)
+          setPairingCode(null)
           log("QR code received.")
-          log("Open WhatsApp on your phone -> Linked Devices -> Link a Device.")
           setStatus("Scan the QR code with WhatsApp -> Linked Devices.")
           startPolling()
           return
         }
-        if (String(data?.instance?.state || "").toLowerCase() === "open") {
+        if (data?.instance?.state === "open") {
           applyConnectionState("open")
+          log("Connected.")
           return
         }
         log("No QR in response yet. Retrying...")
-        await new Promise((r) => setTimeout(r, 3000))
+        await new Promise((r) => setTimeout(r, 2000 * attempt))
       }
       setStatus("Could not get QR after 5 attempts. Check server logs.", true)
     } catch (err) {
       log(`ERROR: ${err instanceof Error ? err.message : "Unknown"}`)
       setStatus("Failed to get QR code.", true)
+    } finally {
+      setIsRunning(false)
+    }
+  }
+
+  async function onGetPairingCode() {
+    const phone = pairingPhone.trim()
+    if (!phone) {
+      setStatus("Enter a phone number.", true)
+      return
+    }
+    try {
+      setIsRunning(true)
+      await api("POST", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME }).catch(() => {})
+      const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/connect?number=${encodeURIComponent(phone)}`)
+      if (data.code) {
+        setPairingCode(data.code)
+        setQrCode(null)
+        log(`Pairing code received: ${data.code}`)
+        setStatus('Open WhatsApp → Linked Devices → "Pair with code instead"')
+        startPolling()
+      } else if (data?.instance?.state === "open") {
+        applyConnectionState("open")
+      } else {
+        setStatus("Failed to get pairing code.", true)
+      }
+    } catch (err) {
+      log(`ERROR: ${err instanceof Error ? err.message : "Unknown"}`)
+      setStatus("Failed to get pairing code.", true)
     } finally {
       setIsRunning(false)
     }
@@ -262,6 +322,7 @@ export default function AnnouncementsPage() {
       log("Instance logged out.")
       setConnectionState("close")
       setQrCode(null)
+      setPairingCode(null)
       setStatus('Instance logged out. Click "Get QR Code" to reconnect.')
     } catch (err) {
       log(`Logout error: ${err instanceof Error ? err.message : "Unknown"}`)
@@ -432,18 +493,13 @@ export default function AnnouncementsPage() {
   }
 
   useEffect(() => {
-    log("Announcements ready.")
-    log('Step 1: Click "Check Server"')
-    log('Step 2: Click "Create Instance"')
-    log('Step 3: Click "Get QR Code" and scan with WhatsApp')
-    log("Step 4: Select audience, review contacts, and send")
+    checkInitialState()
     loadAudienceGroups()
     const params = new URLSearchParams(window.location.search)
     const invoiceParam = params.get("invoice")
     if (invoiceParam && !message.trim()) {
       setMessage(`Please complete your pending fee payment using your secure link:\n${paymentLinkForInvoice(invoiceParam)}`)
     }
-    fetchConnectionState(true)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -473,7 +529,7 @@ export default function AnnouncementsPage() {
                   : "bg-gray-100 text-gray-800"
             }`}
           >
-            {connectionState === "open" ? "Connected" : connectionState === "connecting" ? "Connecting..." : "Disconnected"}
+            {connectionState === "open" ? "Connected" : connectionState === "connecting" ? "Reconnecting..." : "Disconnected"}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -483,9 +539,6 @@ export default function AnnouncementsPage() {
           <button onClick={onCreateInstance} disabled={isRunning} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
             2. Create Instance
           </button>
-          <button onClick={onConnect} disabled={isRunning} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
-            3. Get QR Code
-          </button>
           <button onClick={onCheckState} disabled={isRunning} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
             State
           </button>
@@ -493,10 +546,63 @@ export default function AnnouncementsPage() {
             Logout
           </button>
         </div>
+        {connectionState === "close" && (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-1">
+              <button
+                onClick={() => setConnectMode("qr")}
+                className={`inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors h-8 px-3 border ${
+                  connectMode === "qr"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background border-input hover:bg-accent"
+                }`}
+              >
+                QR Code
+              </button>
+              <button
+                onClick={() => setConnectMode("code")}
+                className={`inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors h-8 px-3 border ${
+                  connectMode === "code"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background border-input hover:bg-accent"
+                }`}
+              >
+                Pairing Code
+              </button>
+            </div>
+            {connectMode === "qr" ? (
+              <div className="space-y-2">
+                <button onClick={onConnect} disabled={isRunning} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
+                  Get QR Code
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    placeholder="Phone (e.g. 919876543210)"
+                    value={pairingPhone}
+                    onChange={(e) => setPairingPhone(e.target.value)}
+                    className="flex h-9 w-full max-w-xs rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                  <button onClick={onGetPairingCode} disabled={isRunning} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
+                    Get Code
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {qrCode && (
           <div className="flex flex-col items-center mt-2">
             <img src={qrCode} className="w-44 h-44 border rounded-md" alt="QR Code" />
             <p className="text-xs text-muted-foreground mt-1">Scan with WhatsApp &rarr; Linked Devices</p>
+          </div>
+        )}
+        {pairingCode && (
+          <div className="flex flex-col items-center mt-2">
+            <span className="text-2xl font-mono font-bold tracking-widest bg-muted px-6 py-3 rounded-md select-all">{pairingCode}</span>
+            <p className="text-xs text-muted-foreground mt-1">Open WhatsApp &rarr; Linked Devices &rarr; &ldquo;Pair with code instead&rdquo;</p>
           </div>
         )}
       </div>

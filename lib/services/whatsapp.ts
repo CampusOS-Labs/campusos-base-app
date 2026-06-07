@@ -53,30 +53,52 @@ export class WhatsAppManager {
     this.instances.set(name, { state: "close" })
   }
 
-  getState(name: string): { state: string; qr?: string | null } {
-    const inst = this.instances.get(name)
-    if (!inst) return { state: "close" }
-
-    this.api("GET", `/instance/connectionState/${encodeURIComponent(name)}`)
-      .then((data) => {
-        const raw = data?.instance?.state as string | undefined
-        if (raw === "open") inst.state = "open"
-        else if (raw === "connecting" || raw === "syncing") inst.state = "connecting"
-        else inst.state = "close"
-      })
-      .catch(() => {})
-
-    return { state: inst.state, qr: null }
+  async getState(name: string): Promise<{ state: string; qr?: string | null }> {
+    try {
+      const data = await this.api("GET", `/instance/connectionState/${encodeURIComponent(name)}`)
+      const raw = data?.instance?.state as string | undefined
+      let mappedState: "open" | "connecting" | "close"
+      if (raw === "open") {
+        mappedState = "open"
+      } else if (raw === "connecting" || raw === "syncing") {
+        mappedState = "connecting"
+      } else {
+        mappedState = "close"
+      }
+      this.instances.set(name, { state: mappedState })
+      return { state: mappedState, qr: null }
+    } catch {
+      const inst = this.instances.get(name)
+      if (inst) return { state: inst.state, qr: null }
+      return { state: "close" }
+    }
   }
 
-  async connect(name: string): Promise<{ base64?: string; state: string }> {
+  async connect(
+    name: string,
+    phoneNumber?: string,
+  ): Promise<{ base64?: string; code?: string; state: string }> {
     await this.getOrCreateInstance(name)
 
     const inst = this.instances.get(name)
     if (!inst) return { state: "close" }
 
-    for (let i = 0; i < 5; i++) {
-      if (i > 0) await new Promise((r) => setTimeout(r, 3000))
+    if (phoneNumber) {
+      const data = await this.api(
+        "GET",
+        `/instance/connect/${encodeURIComponent(name)}?number=${encodeURIComponent(phoneNumber)}`,
+      )
+      const pairingCode = data.pairingCode || data.code
+      if (!pairingCode) {
+        throw new Error("Evolution API returned no pairing code. This may be a known bug with this version.")
+      }
+      inst.state = "connecting"
+      return { code: pairingCode, state: "connecting" }
+    }
+
+    const delays = [1000, 2000, 4000]
+    for (let i = 0; i < 3; i++) {
+      if (i > 0) await new Promise((r) => setTimeout(r, delays[i - 1]))
 
       try {
         const data = await this.api(
@@ -104,16 +126,16 @@ export class WhatsAppManager {
 
   async logout(name: string): Promise<void> {
     try {
-      await this.api("DELETE", `/instance/logout/${encodeURIComponent(name)}`)
+      await this.api("DELETE", `/instance/delete/${encodeURIComponent(name)}`)
     } catch {}
     this.instances.delete(name)
   }
 
-  async sendMessage(name: string, number: string, text: string): Promise<void> {
+  async sendMessage(name: string, number: string, text: string, delay?: number): Promise<void> {
     await this.api("POST", `/message/sendText/${encodeURIComponent(name)}`, {
       number,
       text,
-      delay: 1200,
+      delay: delay ?? 1200,
     })
   }
 
