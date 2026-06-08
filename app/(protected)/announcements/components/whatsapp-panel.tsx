@@ -1,24 +1,25 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { QrCode, Key, LogOut } from "lucide-react"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import Image from "next/image";
+import { QrCode, Key, LogOut } from "lucide-react";
 
-type ConnectionState = "open" | "connecting" | "close" | "unknown"
+type ConnectionState = "open" | "connecting" | "close" | "unknown";
 
 type Props = {
-  connectionState: ConnectionState
-  qrCode: string | null
-  pairingCode: string | null
-  pairingPhone: string
-  connectMode: "qr" | "code"
-  isRunning: boolean
-  onLogout: () => Promise<void>
-  onConnect: () => Promise<void>
-  onGetPairingCode: () => Promise<void>
-  onPairingPhoneChange: (phone: string) => void
-  onConnectModeChange: (mode: "qr" | "code") => void
-}
+  connectionState: ConnectionState;
+  qrCode: string | null;
+  pairingCode: string | null;
+  pairingPhone: string;
+  connectMode: "qr" | "code";
+  isRunning: boolean;
+  onLogout: () => Promise<void>;
+  onConnect: () => Promise<void>;
+  onGetPairingCode: () => Promise<void>;
+  onPairingPhoneChange: (phone: string) => void;
+  onConnectModeChange: (mode: "qr" | "code") => void;
+};
 
 export function WhatsAppPanel({
   connectionState,
@@ -33,7 +34,7 @@ export function WhatsAppPanel({
   onPairingPhoneChange,
   onConnectModeChange,
 }: Props) {
-  const isConnected = connectionState === "open"
+  const isConnected = connectionState === "open";
 
   if (isConnected) {
     return (
@@ -46,13 +47,15 @@ export function WhatsAppPanel({
           <LogOut /> Disconnect
         </Button>
       </div>
-    )
+    );
   }
 
   return (
     <div className="rounded-lg border bg-muted/30 px-4 py-3 space-y-3">
       <div className="flex items-center gap-2">
-        <span className={`size-2 rounded-full ${connectionState === "connecting" ? "bg-yellow-500" : "bg-gray-300"}`} />
+        <span
+          className={`size-2 rounded-full ${connectionState === "connecting" ? "bg-yellow-500" : "bg-gray-300"}`}
+        />
         <span className="text-sm font-medium">
           {connectionState === "connecting" ? "Connecting..." : "WhatsApp Disconnected"}
         </span>
@@ -95,7 +98,14 @@ export function WhatsAppPanel({
 
       {qrCode && (
         <div className="flex flex-col items-center gap-1">
-          <img src={qrCode} className="w-36 h-36 border rounded-md" alt="QR Code" />
+          <Image
+            src={qrCode}
+            className="w-36 h-36 border rounded-md"
+            alt="QR Code"
+            width={144}
+            height={144}
+            unoptimized
+          />
           <p className="text-xs text-muted-foreground">Scan with WhatsApp → Linked Devices</p>
         </div>
       )}
@@ -111,5 +121,5 @@ export function WhatsAppPanel({
         </div>
       )}
     </div>
-  )
+  );
 }

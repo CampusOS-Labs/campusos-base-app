@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
+import Script from "next/script";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { cn } from "@/lib/utils";
 
 declare global {
   interface Window {
@@ -55,21 +55,6 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function loadRazorpayScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.Razorpay) {
-      resolve();
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Razorpay SDK"));
-    document.body.appendChild(script);
-  });
-}
-
 export default function PayInvoicePage() {
   const params = useParams();
   const invoiceId = params.invoiceId as string;
@@ -80,6 +65,7 @@ export default function PayInvoicePage() {
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");
   const [paymentMsg, setPaymentMsg] = useState("");
   const [verifyData, setVerifyData] = useState<VerifyData | null>(null);
+  const [isRazorpayReady, setIsRazorpayReady] = useState(false);
 
   const fetchInvoice = useCallback(async () => {
     setLoading(true);
@@ -105,6 +91,10 @@ export default function PayInvoicePage() {
     setPaymentMsg("");
 
     try {
+      if (!isRazorpayReady || !window.Razorpay) {
+        throw new Error("Payment gateway is still loading. Please try again.");
+      }
+
       const orderRes = await fetch("/api/payments/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -113,8 +103,6 @@ export default function PayInvoicePage() {
       const orderJson = await orderRes.json();
       if (!orderJson.success) throw new Error(orderJson.error || "Failed to create order");
       const order = orderJson.data;
-
-      await loadRazorpayScript();
 
       const options = {
         key: invoice!.razorpayKeyId,
@@ -145,14 +133,11 @@ export default function PayInvoicePage() {
             const verifyJson = await verifyRes.json();
             if (!verifyJson.success) {
               throw new Error(
-                verifyJson.error ||
-                  "Verification failed. Payment may have been received.",
+                verifyJson.error || "Verification failed. Payment may have been received.",
               );
             }
             setVerifyData(verifyJson.data);
-            setInvoice((prev) =>
-              prev ? { ...prev, status: "paid" } : prev,
-            );
+            setInvoice((prev) => (prev ? { ...prev, status: "paid" } : prev));
           } catch (err) {
             setPaymentMsg(
               err instanceof Error
@@ -164,9 +149,7 @@ export default function PayInvoicePage() {
         },
         modal: {
           ondismiss: () => {
-            setPaymentMsg(
-              "Payment was cancelled or failed. You can try again.",
-            );
+            setPaymentMsg("Payment was cancelled or failed. You can try again.");
             setPaymentState("failed");
           },
         },
@@ -213,8 +196,8 @@ export default function PayInvoicePage() {
         </div>
         <h1 className="text-xl font-semibold">Invoice not found</h1>
         <p className="max-w-sm text-center text-muted-foreground">
-          We couldn&apos;t find invoice <strong>{invoiceId}</strong>. Check the
-          link or contact the school for assistance.
+          We couldn&apos;t find invoice <strong>{invoiceId}</strong>. Check the link or contact the
+          school for assistance.
         </p>
         <Button variant="outline" onClick={fetchInvoice}>
           Try again
@@ -301,94 +284,99 @@ export default function PayInvoicePage() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-6 px-4 py-8">
-      <div className="flex flex-col items-center gap-2">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <svg
-            className="size-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z"
-            />
-          </svg>
-        </div>
-        <h1 className="text-lg font-semibold">Complete your payment</h1>
-      </div>
-
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">
-              {invoice.student.name}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {invoice.student.class}
-            </span>
+    <>
+      <Script
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        strategy="afterInteractive"
+        onLoad={() => setIsRazorpayReady(true)}
+        onError={() => {
+          setPaymentState("failed");
+          setPaymentMsg("Failed to load payment gateway. Please refresh and try again.");
+        }}
+      />
+      <div className="flex min-h-svh flex-col items-center justify-center gap-6 px-4 py-8">
+        <div className="flex flex-col items-center gap-2">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <svg
+              className="size-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z"
+              />
+            </svg>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="h-px bg-border" />
-          <Row label="Invoice" value={invoice.invoiceNumber} />
-          <Row label="Due date" value={formatDate(invoice.dueDate)} />
-          <div className="h-px bg-border" />
-
-          <div className="flex items-baseline justify-between pt-1">
-            <span className="text-sm text-muted-foreground">
-              Total amount
-            </span>
-            <span className="text-2xl font-bold tracking-tight">
-              {formatINR(invoice.totalAmount)}
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {paymentState === "failed" && paymentMsg && (
-        <div className="flex w-full max-w-sm items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          <svg
-            className="mt-0.5 size-4 shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
-            />
-          </svg>
-          <span>{paymentMsg}</span>
+          <h1 className="text-lg font-semibold">Complete your payment</h1>
         </div>
-      )}
 
-      <Button
-        className="h-12 w-full max-w-sm text-base font-semibold"
-        onClick={handlePay}
-        disabled={paymentState === "loading" || paymentState === "processing"}
-      >
-        {paymentState === "loading" || paymentState === "processing" ? (
-          <>
-            <Spinner className="mr-2" />
-            {paymentState === "loading"
-              ? "Preparing payment..."
-              : "Verifying payment..."}
-          </>
-        ) : (
-          `Pay ${formatINR(invoice.totalAmount)} with Razorpay`
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">{invoice.student.name}</span>
+              <span className="text-xs text-muted-foreground">{invoice.student.class}</span>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="h-px bg-border" />
+            <Row label="Invoice" value={invoice.invoiceNumber} />
+            <Row label="Due date" value={formatDate(invoice.dueDate)} />
+            <div className="h-px bg-border" />
+
+            <div className="flex items-baseline justify-between pt-1">
+              <span className="text-sm text-muted-foreground">Total amount</span>
+              <span className="text-2xl font-bold tracking-tight">
+                {formatINR(invoice.totalAmount)}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {paymentState === "failed" && paymentMsg && (
+          <div className="flex w-full max-w-sm items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <svg
+              className="mt-0.5 size-4 shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
+              />
+            </svg>
+            <span>{paymentMsg}</span>
+          </div>
         )}
-      </Button>
 
-      <p className="text-center text-xs text-muted-foreground">
-        Powered by <span className="font-medium">Razorpay</span>
-      </p>
-    </div>
+        <Button
+          className="h-12 w-full max-w-sm text-base font-semibold"
+          onClick={handlePay}
+          disabled={paymentState === "loading" || paymentState === "processing" || !isRazorpayReady}
+        >
+          {paymentState === "loading" || paymentState === "processing" ? (
+            <>
+              <Spinner className="mr-2" />
+              {paymentState === "loading" ? "Preparing payment..." : "Verifying payment..."}
+            </>
+          ) : !isRazorpayReady ? (
+            "Loading payment gateway..."
+          ) : (
+            `Pay ${formatINR(invoice.totalAmount)} with Razorpay`
+          )}
+        </Button>
+
+        <p className="text-center text-xs text-muted-foreground">
+          Powered by <span className="font-medium">Razorpay</span>
+        </p>
+      </div>
+    </>
   );
 }
 

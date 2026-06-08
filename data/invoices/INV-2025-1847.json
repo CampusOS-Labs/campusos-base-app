@@ -6,14 +6,14 @@
   "totalAmount": 45000,
   "student": {
     "id": "STU-1847",
-    "name": "Atharva Deodhar",
+    "name": "Sadeed Bilwar",
     "class": "Class 8",
     "rollNumber": "08-23",
     "admissionNumber": "ADM-2021-1847"
   },
   "parent": {
-    "name": "Anjali Deodhar",
+    "name": "Nishad Bilwar",
     "phone": "+91-9970708106",
-    "email": "anjali.deodhar84@gmail.com"
+    "email": "nishad.bilwar@gmail.com"
   }
 }
