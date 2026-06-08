@@ -13,7 +13,7 @@ type Props = {
   onAnnTypeChange: (type: string) => void
 }
 
-const TYPES = ["update", "maintenance", "new", "alert"] as const
+const TYPES = ["update", "maintenance", "new", "alert", "payment-reminder"] as const
 
 export function ComposeForm({
   title,

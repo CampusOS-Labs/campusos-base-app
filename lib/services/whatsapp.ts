@@ -19,7 +19,7 @@ const globalForWhatsApp = globalThis as typeof globalThis & {
 }
 
 const config = {
-  baseUrl: (process.env.EVOLUTION_API_URL || "http://localhost:8080").replace(/\/+$/, ""),
+  baseUrl: (process.env.EVOLUTION_API_URL || "").replace(/\/+$/, ""),
   apiKey: process.env.EVOLUTION_API_KEY || "",
 }
 

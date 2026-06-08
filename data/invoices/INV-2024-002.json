@@ -2,7 +2,7 @@
   "invoiceNumber": "INV-2024-002",
   "academicYear": "2024-25",
   "dueDate": "2024-07-31",
-  "status": "pending",
+  "status": "paid",
   "totalAmount": 23300,
   "student": {
     "id": "STU-205",
@@ -15,5 +15,12 @@
     "name": "Nishad Bilwar",
     "phone": "+1-5137997001",
     "email": "nishad.bilwar@email.com"
+  },
+  "paymentDetails": {
+    "razorpayOrderId": "order_SzBdyynkR3aQHQ",
+    "razorpayPaymentId": "pay_SzBeBw4vq2mzKj",
+    "method": "upi",
+    "paidAt": "2026-06-08T15:30:06.686Z",
+    "updatedAt": "2026-06-08T15:30:06.686Z"
   }
 }

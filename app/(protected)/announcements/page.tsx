@@ -6,6 +6,15 @@ import { WhatsAppPanel } from "./components/whatsapp-panel"
 import { ComposeForm } from "./components/compose-form"
 import { RecipientSelector } from "./components/recipient-selector"
 import { SendStatus } from "./components/send-status"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 type Invoice = {
   invoiceNumber: string
@@ -44,6 +53,7 @@ const TYPE_LABELS: Record<string, string> = {
   maintenance: "Maintenance",
   new: "New",
   alert: "Alert",
+  "payment-reminder": "Payment Reminder",
 }
 
 function normalizePhone(value: string): string {
@@ -78,7 +88,12 @@ function parseConnectPayload(data: any): { qr: string | null; pairingCode: strin
 }
 
 function paymentLinkForInvoice(invoiceId: string): string {
-  return `${window.location.origin}/pay/${invoiceId}`
+  const origin = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+  return `${origin}/pay/${invoiceId}`
+}
+
+function isPaymentReminder(type: string): boolean {
+  return type === "payment-reminder"
 }
 
 function randomDelay(min: number, max: number): number {
@@ -125,6 +140,10 @@ export default function AnnouncementsPage() {
   const [sending, setSending] = useState(false)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pollAttemptsRef = useRef(0)
+  const parentsMapRef = useRef<Map<string, Recipient>>(new Map())
+  const sendAnywayRef = useRef(false)
+  const [showMissingAlert, setShowMissingAlert] = useState(false)
+  const [missingNumbers, setMissingNumbers] = useState<string[]>([])
 
   function setStatus(msg: string, isError = false) {
     setStatusSummary(msg)
@@ -376,12 +395,14 @@ export default function AnnouncementsPage() {
         })
       }
       const allParents = Array.from(parentsMap.values()).sort((a, b) => a.parentName.localeCompare(b.parentName))
+      parentsMapRef.current = parentsMap
       const unpaidParents = allParents
         .map((r) => ({ ...r, invoices: r.invoices.filter((i) => i.status === "pending") }))
         .filter((r) => r.invoices.length > 0)
       const groups: AudienceGroup[] = [
         { id: "unpaid-parents", label: `Unpaid Parents (${unpaidParents.length})`, help: "Parents with pending invoices. Includes payment links.", recipients: unpaidParents },
         { id: "all-parents", label: `All Parents (${allParents.length})`, help: "All parents in the system.", recipients: allParents },
+        { id: "manual", label: "Manual Only", help: "Only send to manually entered phone numbers.", recipients: [] },
       ]
       setAudienceGroups(groups)
       const map = new Map(groups.map((g) => [g.id, g.recipients]))
@@ -415,7 +436,19 @@ export default function AnnouncementsPage() {
     const typeLabel = TYPE_LABELS[annType] || "Update"
     const manualRecipients: Recipient[] = manualContacts
       .filter((c) => normalizePhone(c))
-      .map((c) => ({ phone: normalizePhone(c), parentName: "Parent", invoices: [] }))
+      .map((c) => {
+        const phone = normalizePhone(c)
+        if (isPaymentReminder(annType)) {
+          const matched = parentsMapRef.current.get(phone)
+          if (matched) {
+            return {
+              ...matched,
+              invoices: matched.invoices.filter((i) => i.status === "pending"),
+            }
+          }
+        }
+        return { phone, parentName: "Parent", invoices: [] }
+      })
     const merged = new Map<string, Recipient>()
     for (const r of groupRecipients) merged.set(r.phone, r)
     for (const r of manualRecipients) {
@@ -426,6 +459,18 @@ export default function AnnouncementsPage() {
       setStatus("Select an audience or enter at least one contact.", true)
       return
     }
+    if (isPaymentReminder(annType) && !sendAnywayRef.current) {
+      const manualPhones = manualContacts
+        .filter((c) => normalizePhone(c))
+        .map((c) => normalizePhone(c))
+      const unmatched = manualPhones.filter((p) => !parentsMapRef.current.has(p))
+      if (unmatched.length > 0) {
+        setMissingNumbers(unmatched)
+        setShowMissingAlert(true)
+        return
+      }
+    }
+    sendAnywayRef.current = false
     if (!window.confirm(`Send "${titleTrimmed}" to ${allRecipients.length} contact(s)?`)) return
     setSending(true)
     setStatus("Sending announcement...")
@@ -452,7 +497,7 @@ export default function AnnouncementsPage() {
         const recipient = recipientsToSend[index]
         setStatus(`Sending ${index + 1} of ${recipientsToSend.length}...`)
         const textLines = [`[${typeLabel}] ${titleTrimmed}`, "", messageTrimmed]
-        if (recipient.invoices.length > 0) {
+        if (isPaymentReminder(annType) && recipient.invoices.length > 0) {
           textLines.push("", "Pending payment link(s):")
           for (const inv of recipient.invoices) {
             textLines.push(`- ${inv.studentName} (${inv.invoiceNumber}) ${paymentLinkForInvoice(inv.invoiceNumber)}`)
@@ -562,6 +607,36 @@ export default function AnnouncementsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={showMissingAlert} onOpenChange={setShowMissingAlert}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unmatched Phone Numbers</DialogTitle>
+            <DialogDescription>
+              These phone numbers don{"'"}t match any parent in the system. They won{"'"}t receive payment links.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="list-disc pl-5 space-y-1">
+            {missingNumbers.map((n) => (
+              <li key={n} className="text-sm text-muted-foreground">{n}</li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMissingAlert(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                sendAnywayRef.current = true
+                setShowMissingAlert(false)
+                onSend()
+              }}
+            >
+              Send Anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
