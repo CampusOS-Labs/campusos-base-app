@@ -161,9 +161,9 @@ export default function PaymentsPage() {
                     <td className="px-4 py-3 text-muted-foreground">{formatDate(inv.dueDate)}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-1">
-                        {/*<Button variant="outline" size="xs" onClick={() => copyLink(inv.invoiceNumber)}>
+                        <Button variant="outline" size="xs" onClick={() => copyLink(inv.invoiceNumber)}>
                           <Copy /> Copy Link
-                        </Button>*/}
+                        </Button>
                         <Button size="xs" onClick={() => remindToPay(inv.invoiceNumber)}>
                           <Bell /> Remind
                         </Button>
