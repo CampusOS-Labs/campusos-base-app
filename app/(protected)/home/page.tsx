@@ -1,11 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Receipt, AlertCircle, CheckCircle, ArrowRight } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { ArrowRight, Bell, Receipt } from "lucide-react"
 import Link from "next/link"
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ChartAreaInteractive } from "@/components/chart-area-interactive"
+import { InvoiceTable } from "@/components/invoice-table"
+import { SectionCards } from "@/components/section-cards"
 
 type Invoice = {
   invoiceNumber: string
@@ -17,7 +20,7 @@ type Invoice = {
   parent: { name: string; phone: string; email: string }
 }
 
-function formatCurrencyRaw(amount: number) {
+function formatCurrency(amount: number) {
   return `₹${amount.toLocaleString("en-IN")}`
 }
 
@@ -46,22 +49,16 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center pt-6">
-        <div className="w-full max-w-2xl">
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-4">Loading...</p>
-        </div>
+      <div className="px-4 lg:px-6">
+        <p className="text-sm text-muted-foreground">Loading...</p>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="flex justify-center pt-6">
-        <div className="w-full max-w-2xl">
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-destructive mt-4">{error}</p>
-        </div>
+      <div className="px-4 lg:px-6">
+        <p className="text-sm text-destructive">{error}</p>
       </div>
     )
   }
@@ -70,100 +67,84 @@ export default function HomePage() {
   const paid = invoices.filter((inv) => inv.status === "paid")
   const totalDue = pending.reduce((sum, inv) => sum + inv.totalAmount, 0)
   const totalCollected = paid.reduce((sum, inv) => sum + inv.totalAmount, 0)
-  const recentInvoices = invoices.slice(0, 5)
+
+  const sectionCards = [
+    {
+      title: "Total Invoices",
+      value: String(invoices.length),
+      description: "All invoices in the system",
+      trend: "up" as const,
+      trendLabel: "Total issued",
+      trendValue: "",
+    },
+    {
+      title: "Pending",
+      value: formatCurrency(totalDue),
+      description: `${pending.length} unpaid invoice(s)`,
+      trend: "down" as const,
+      trendLabel: `${pending.length} pending`,
+      trendValue: "",
+    },
+    {
+      title: "Collected",
+      value: formatCurrency(totalCollected),
+      description: `${paid.length} paid invoice(s)`,
+      trend: "up" as const,
+      trendLabel: `${paid.length} paid`,
+      trendValue: "",
+    },
+    {
+      title: "Collection Rate",
+      value: invoices.length > 0
+        ? `${Math.round((paid.length / invoices.length) * 100)}%`
+        : "0%",
+      description: "Of total invoices paid",
+      trend: "up" as const,
+      trendLabel: "Overall rate",
+      trendValue: "",
+    },
+  ]
 
   return (
-    <div className="flex justify-center pt-6 pb-12">
-      <div className="w-full max-w-2xl space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">Overview of your school payments.</p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card size="sm">
+    <>
+      <SectionCards cards={sectionCards} />
+      <div className="px-4 lg:px-6">
+        <ChartAreaInteractive />
+      </div>
+      <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @5xl/main:grid-cols-2">
+        <Link href="/announcements">
+          <Card className="cursor-pointer transition-colors hover:bg-muted/50">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm text-muted-foreground">Total Invoices</CardTitle>
+                <CardTitle>Send Announcement</CardTitle>
+                <Bell className="size-4 text-muted-foreground" />
+              </div>
+            </CardHeader>
+            <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
+              Send a WhatsApp message to parents
+              <ArrowRight className="size-4 ml-auto" />
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/payments">
+          <Card className="cursor-pointer transition-colors hover:bg-muted/50">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>View Payments</CardTitle>
                 <Receipt className="size-4 text-muted-foreground" />
               </div>
             </CardHeader>
-            <CardContent>
-              <span className="text-2xl font-semibold">{invoices.length}</span>
+            <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
+              Track unpaid invoices and send reminders
+              <ArrowRight className="size-4 ml-auto" />
             </CardContent>
           </Card>
-          <Card size="sm">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm text-muted-foreground">Pending</CardTitle>
-                <AlertCircle className="size-4 text-yellow-600" />
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-1">
-              <span className="text-2xl font-semibold">{pending.length}</span>
-              <div className="text-xs text-muted-foreground">{formatCurrencyRaw(totalDue)}</div>
-            </CardContent>
-          </Card>
-          <Card size="sm">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm text-muted-foreground">Collected</CardTitle>
-                <CheckCircle className="size-4 text-green-600" />
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-1">
-              <span className="text-2xl font-semibold">{paid.length}</span>
-              <div className="text-xs text-muted-foreground">{formatCurrencyRaw(totalCollected)}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <Link href="/announcements">
-              <Button variant="default">
-                Send Announcement <ArrowRight />
-              </Button>
-            </Link>
-            <Link href="/payments">
-              <Button variant="outline">
-                View Payments <ArrowRight />
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Invoices</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentInvoices.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No invoices yet.</p>
-            ) : (
-              <div className="divide-y">
-                {recentInvoices.map((inv) => (
-                  <div key={inv.invoiceNumber} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{inv.student.name}</div>
-                      <div className="text-xs text-muted-foreground">{inv.parent.name}</div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-sm">{formatCurrencyRaw(inv.totalAmount)}</span>
-                      <Badge variant={inv.status === "paid" ? "success" : "default"}>
-                        {inv.status === "paid" ? "Paid" : "Pending"}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        </Link>
       </div>
-    </div>
+      <div>
+        <h2 className="px-4 text-lg font-semibold lg:px-6">Recent Invoices</h2>
+        <InvoiceTable data={invoices} />
+      </div>
+    </>
   )
 }

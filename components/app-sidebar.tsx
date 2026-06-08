@@ -1,16 +1,17 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { LogOutIcon } from "lucide-react";
+import { useState } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import {
+  LayoutDashboard,
+  Receipt,
+  Megaphone,
+  ScrollText,
+} from "lucide-react"
 
-import { signOut, useSession } from "@/lib/auth-client";
-import { cn } from "@/lib/utils";
-import { Avatar, AvatarBadge, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
+import { signOut, useSession } from "@/lib/auth-client"
+import { NavMain } from "@/components/nav-main"
+import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
   SidebarContent,
@@ -19,125 +20,92 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@/components/ui/sidebar"
 
-const nav = [
-  { title: "Home", href: "/home" },
-  { title: "Payments", href: "/payments" },
-  { title: "Announcements", href: "/announcements" },
-  { title: "Logs", href: "/logs" },
-] as const;
+const navMain = [
+  { title: "Home", url: "/home", icon: LayoutDashboard },
+  { title: "Payments", url: "/payments", icon: Receipt },
+  { title: "Announcements", url: "/announcements", icon: Megaphone },
+  { title: "Logs", url: "/logs", icon: ScrollText },
+]
 
 function getInitials(name?: string | null, email?: string | null): string {
   if (name?.trim()) {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
+    const parts = name.trim().split(/\s+/).filter(Boolean)
     if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     }
-    return parts[0].slice(0, 2).toUpperCase();
+    return parts[0].slice(0, 2).toUpperCase()
   }
-
   if (email) {
-    const prefix = email.split("@")[0] ?? "";
-    const letters = prefix.replace(/[^a-zA-Z0-9]/g, "");
-    return (letters.slice(0, 2) || prefix.slice(0, 2) || "?").toUpperCase();
+    const prefix = email.split("@")[0] ?? ""
+    const letters = prefix.replace(/[^a-zA-Z0-9]/g, "")
+    return (letters.slice(0, 2) || prefix.slice(0, 2) || "?").toUpperCase()
   }
-
-  return "?";
+  return "?"
 }
 
 function getDisplayName(name?: string | null, email?: string | null): string {
-  if (name?.trim()) return name.trim();
-  if (email) return email.split("@")[0] ?? email;
-  return "User";
+  if (name?.trim()) return name.trim()
+  if (email) return email.split("@")[0] ?? email
+  return "User"
 }
 
 export function AppSidebar({ className, ...props }: React.ComponentProps<typeof Sidebar>) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const { data: session, isPending } = useSession();
-  const user = session?.user;
-  const [isSigningOut, setIsSigningOut] = useState(false);
+  const pathname = usePathname()
+  const router = useRouter()
+  const { data: session, isPending } = useSession()
+  const user = session?.user
+  const [isSigningOut, setIsSigningOut] = useState(false)
+
+  const navItems = navMain.map((item) => ({
+    ...item,
+    isActive: pathname === item.url,
+  }))
 
   async function handleSignOut() {
-    setIsSigningOut(true);
-
+    setIsSigningOut(true)
     try {
-      await signOut();
-      router.push("/login");
-      router.refresh();
+      await signOut()
+      router.push("/login")
+      router.refresh()
     } finally {
-      setIsSigningOut(false);
+      setIsSigningOut(false)
     }
   }
 
   return (
     <Sidebar
-      collapsible="none"
-      className={cn(
-        "sticky top-0 flex h-svh shrink-0 flex-col self-start overflow-hidden border-r border-sidebar-border",
-        className,
-      )}
+      collapsible="offcanvas"
+      className={className}
       {...props}
     >
-      <SidebarHeader className="shrink-0 px-5 py-3">
-        <div className="flex items-center gap-2">
-          {isPending ? (
-            <>
-              <Skeleton className="size-6 shrink-0 rounded-full" />
-              <div className="flex flex-col gap-1">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-3 w-32" />
-              </div>
-            </>
-          ) : (
-            <>
-              <Avatar size="sm">
-                <AvatarFallback>{getInitials(user?.name, user?.email)}</AvatarFallback>
-                <AvatarBadge className="ring-sidebar" />
-              </Avatar>
-              <div className="flex flex-col">
-                <span className="font-medium leading-tight">
-                  {getDisplayName(user?.name, user?.email)}
-                </span>
-                <span className="text-xs text-muted-foreground">{user?.email ?? "—"}</span>
-              </div>
-            </>
-          )}
-        </div>
-      </SidebarHeader>
-      <SidebarContent className="min-h-0 flex-1 overflow-hidden px-3 pt-4">
+      <SidebarHeader>
         <SidebarMenu>
-          {nav.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
-                isActive={pathname === item.href}
-                render={<Link href={item.href} />}
-                className={cn(
-                  "pl-4 relative hover:bg-zinc-200",
-                  pathname === item.href && [
-                    "data-active:!bg-transparent data-active:!text-foreground data-active:font-semibold data-active:hover:!bg-transparent",
-                    "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:bg-foreground before:rounded-full",
-                  ],
-                )}
-              >
-                {item.title}
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              render={<a href="/home" />}
+              className="data-[slot=sidebar-menu-button]:p-1.5"
+            >
+              <span className="text-base font-semibold">CampusOS</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        <NavMain items={navItems} />
       </SidebarContent>
-      <SidebarFooter className="shrink-0 px-3 pt-2 pb-4">
-        <Button
-          variant="outline"
-          className="w-full"
-          disabled={isSigningOut}
-          onClick={handleSignOut}
-        >
-          {isSigningOut ? <Spinner /> : <LogOutIcon data-icon="inline-start" />}
-          Log out
-        </Button>
+      <SidebarFooter>
+        <NavUser
+          user={{
+            name: getDisplayName(user?.name, user?.email),
+            email: user?.email ?? "",
+            avatar: "",
+          }}
+          onLogout={handleSignOut}
+          isSigningOut={isSigningOut}
+        />
       </SidebarFooter>
     </Sidebar>
-  );
+  )
 }
