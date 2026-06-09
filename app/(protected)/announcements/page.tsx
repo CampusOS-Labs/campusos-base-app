@@ -15,6 +15,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { getUserGroups, getGroupWithContacts } from "@/lib/actions/groups"
+import { logAnnouncement } from "@/lib/actions/announcements"
 
 type Invoice = {
   invoiceNumber: string
@@ -377,37 +379,69 @@ export default function AnnouncementsPage() {
 
   async function loadAudienceGroups() {
     try {
-      const res = await fetch("/api/invoices")
-      const json = await res.json()
-      if (!json.success) throw new Error()
-      const invoices: Invoice[] = json.data
-      const parentsMap = new Map<string, Recipient>()
-      for (const invoice of invoices) {
-        const phone = normalizePhone(invoice?.parent?.phone)
-        if (!phone) continue
-        if (!parentsMap.has(phone)) {
-          parentsMap.set(phone, { phone, parentName: invoice?.parent?.name || "Parent", invoices: [] })
+      const groups: AudienceGroup[] = []
+      const map = new Map<string, Recipient[]>()
+
+      try {
+        const res = await fetch("/api/invoices")
+        const json = await res.json()
+        if (json.success) {
+          const invoices: Invoice[] = json.data
+          const parentsMap = new Map<string, Recipient>()
+          for (const invoice of invoices) {
+            const phone = normalizePhone(invoice?.parent?.phone)
+            if (!phone) continue
+            if (!parentsMap.has(phone)) {
+              parentsMap.set(phone, { phone, parentName: invoice?.parent?.name || "Parent", invoices: [] })
+            }
+            const recipient = parentsMap.get(phone)!
+            recipient.invoices.push({
+              invoiceNumber: invoice.invoiceNumber,
+              studentName: invoice?.student?.name || "Student",
+              totalAmount: Number(invoice.totalAmount || 0),
+              status: String(invoice.status || "pending").toLowerCase() === "paid" ? "paid" : "pending",
+            })
+          }
+          const allParents = Array.from(parentsMap.values()).sort((a, b) => a.parentName.localeCompare(b.parentName))
+          parentsMapRef.current = parentsMap
+          const unpaidParents = allParents
+            .map((r) => ({ ...r, invoices: r.invoices.filter((i) => i.status === "pending") }))
+            .filter((r) => r.invoices.length > 0)
+
+          groups.push(
+            { id: "unpaid-parents", label: `Unpaid Parents (${unpaidParents.length})`, help: "Parents with pending invoices. Includes payment links.", recipients: unpaidParents },
+            { id: "all-parents", label: `All Parents (${allParents.length})`, help: "All parents in the system.", recipients: allParents },
+          )
+          map.set("unpaid-parents", unpaidParents)
+          map.set("all-parents", allParents)
         }
-        const recipient = parentsMap.get(phone)!
-        recipient.invoices.push({
-          invoiceNumber: invoice.invoiceNumber,
-          studentName: invoice?.student?.name || "Student",
-          totalAmount: Number(invoice.totalAmount || 0),
-          status: String(invoice.status || "pending").toLowerCase() === "paid" ? "paid" : "pending",
-        })
-      }
-      const allParents = Array.from(parentsMap.values()).sort((a, b) => a.parentName.localeCompare(b.parentName))
-      parentsMapRef.current = parentsMap
-      const unpaidParents = allParents
-        .map((r) => ({ ...r, invoices: r.invoices.filter((i) => i.status === "pending") }))
-        .filter((r) => r.invoices.length > 0)
-      const groups: AudienceGroup[] = [
-        { id: "unpaid-parents", label: `Unpaid Parents (${unpaidParents.length})`, help: "Parents with pending invoices. Includes payment links.", recipients: unpaidParents },
-        { id: "all-parents", label: `All Parents (${allParents.length})`, help: "All parents in the system.", recipients: allParents },
-        { id: "manual", label: "Manual Only", help: "Only send to manually entered phone numbers.", recipients: [] },
-      ]
+      } catch {}
+
+      try {
+        const userGroups = await getUserGroups()
+        for (const g of userGroups) {
+          if (g.contactCount === 0) continue
+          const groupData = await getGroupWithContacts(g.id)
+          const recipients: Recipient[] = groupData.contacts.map((c) => ({
+            phone: c.phoneNumber,
+            parentName: c.name,
+            invoices: [],
+          }))
+          const groupId = `group-${g.id}`
+          groups.push({
+            id: groupId,
+            label: `${g.name} (${recipients.length})`,
+            help: `Saved group: ${g.description || g.name}`,
+            recipients,
+          })
+          map.set(groupId, recipients)
+        }
+      } catch {}
+
+      groups.push({ id: "manual", label: "Manual Only", help: "Only send to manually entered phone numbers.", recipients: [] })
+      map.set("manual", [])
+
       setAudienceGroups(groups)
-      const map = new Map(groups.map((g) => [g.id, g.recipients]))
       setRecipientsByAudience(map)
       if (groups.length > 0) {
         const defaultId = annType === "payment-reminder" ? "unpaid-parents" : "all-parents"
@@ -486,7 +520,7 @@ export default function AnnouncementsPage() {
     setSending(true)
     setStatus("Sending announcement...")
     try {
-      let validPhoneSet = new Set(allRecipients.map((r) => r.phone))
+      let validPhoneSet = new Set(allRecipients.map((r) => normalizePhone(r.phone)))
       try {
         const validation = await api("POST", `/api/whatsapp/instance/${INSTANCE_NAME}/validate`, {
           numbers: allRecipients.map((r) => r.phone),
@@ -497,7 +531,7 @@ export default function AnnouncementsPage() {
             .map((item: { number: string }) => normalizePhone(item.number))
         )
       } catch {}
-      const recipientsToSend = allRecipients.filter((r) => validPhoneSet.has(r.phone))
+      const recipientsToSend = allRecipients.filter((r) => validPhoneSet.has(normalizePhone(r.phone)))
       if (recipientsToSend.length === 0) {
         setStatus("No valid WhatsApp numbers found.", true)
         setSending(false)
@@ -550,6 +584,16 @@ export default function AnnouncementsPage() {
       }
       const sentCount = results.filter((r) => r.ok).length
       const failedCount = results.length - sentCount
+
+      logAnnouncement({
+        title: titleTrimmed,
+        message: messageTrimmed || null,
+        type: annType,
+        recipientCount: sentCount,
+        groupId: selectedAudience.startsWith("group-") ? selectedAudience.slice(6) : null,
+        audienceLabel: audienceGroups.find((g) => g.id === selectedAudience)?.label || null,
+      }).catch(() => {})
+
       if (failedCount > 0) {
         setStatus(`Sent to ${sentCount} contact(s). ${failedCount} failed.`, true)
       } else {
