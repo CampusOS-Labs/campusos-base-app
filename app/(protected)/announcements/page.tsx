@@ -133,7 +133,7 @@ export default function AnnouncementsPage() {
   const [groupRecipients, setGroupRecipients] = useState<Recipient[]>([])
   const [title, setTitle] = useState("")
   const [message, setMessage] = useState("")
-  const [annType, setAnnType] = useState("update")
+  const [annType, setAnnType] = useState("announcement")
   const [manualContacts, setManualContacts] = useState<string[]>([""])
   const [statusSummary, setStatusSummary] = useState("Ready.")
   const [statusIsError, setStatusIsError] = useState(false)
@@ -408,8 +408,10 @@ export default function AnnouncementsPage() {
       const map = new Map(groups.map((g) => [g.id, g.recipients]))
       setRecipientsByAudience(map)
       if (groups.length > 0) {
-        setSelectedAudience(groups[0].id)
-        setGroupRecipients(groups[0].recipients)
+        const defaultId = annType === "payment-reminder" ? "unpaid-parents" : "all-parents"
+        const firstId = groups.find((g) => g.id === defaultId) ? defaultId : groups[0].id
+        setSelectedAudience(firstId)
+        setGroupRecipients(map.get(firstId) || [])
       }
     } catch {
       setStatus("Could not load contact groups.", true)
@@ -450,7 +452,9 @@ export default function AnnouncementsPage() {
         return { phone, parentName: "Parent", invoices: [] }
       })
     const merged = new Map<string, Recipient>()
-    for (const r of groupRecipients) merged.set(r.phone, r)
+    if (selectedAudience !== "manual") {
+      for (const r of groupRecipients) merged.set(r.phone, r)
+    }
     for (const r of manualRecipients) {
       if (!merged.has(r.phone)) merged.set(r.phone, r)
     }
@@ -459,7 +463,7 @@ export default function AnnouncementsPage() {
       setStatus("Select an audience or enter at least one contact.", true)
       return
     }
-    if (isPaymentReminder(annType) && !sendAnywayRef.current) {
+    if (isPaymentReminder(annType) && selectedAudience === "manual" && !sendAnywayRef.current) {
       const manualPhones = manualContacts
         .filter((c) => normalizePhone(c))
         .map((c) => normalizePhone(c))
@@ -547,12 +551,19 @@ export default function AnnouncementsPage() {
     const audienceParam = params.get("audience")
     if (audienceParam && recipientsByAudience.has(audienceParam)) {
       handleAudienceChange(audienceParam)
+      return
     }
-  }, [recipientsByAudience]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (recipientsByAudience.size > 0) {
+      const targetId = annType === "payment-reminder" ? "unpaid-parents" : "all-parents"
+      if (recipientsByAudience.has(targetId)) {
+        handleAudienceChange(targetId)
+      }
+    }
+  }, [recipientsByAudience, annType]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex justify-center pt-6 pb-12">
-      <div className="w-full max-w-xl space-y-4">
+      <div className="w-full max-w-[66.666667%] space-y-4">
         <div>
           <h1 className="text-2xl font-semibold">New Announcement</h1>
           <p className="text-sm text-muted-foreground mt-1">Send a WhatsApp message to parents.</p>

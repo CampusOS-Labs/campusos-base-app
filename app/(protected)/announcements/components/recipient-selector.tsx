@@ -66,37 +66,39 @@ export function RecipientSelector({
           )}
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium">Manual Contacts</label>
-            <Button variant="outline" size="xs" onClick={onAddContact}>
-              <Plus /> Add
-            </Button>
+        {selectedAudience === "manual" && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Manual Contacts</label>
+              <Button variant="outline" size="xs" onClick={onAddContact}>
+                <Plus /> Add
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {manualContacts.map((contact, i) => (
+                <div key={i} className="flex gap-1">
+                  <Input
+                    placeholder={`+15551234567`}
+                    value={contact}
+                    onChange={(e) => onManualContactChange(i, e.target.value)}
+                    className="flex-1"
+                  />
+                  {manualContacts.length > 1 && (
+                    <Button variant="ghost" size="icon" onClick={() => onRemoveContact(i)}>
+                      <X />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {groupRecipients.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {groupRecipients.length} contact(s) from selected audience
+                {manualContacts.some((c) => c.trim()) && " + manual entries"}
+              </p>
+            )}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {manualContacts.map((contact, i) => (
-              <div key={i} className="flex gap-1">
-                <Input
-                  placeholder={`+15551234567`}
-                  value={contact}
-                  onChange={(e) => onManualContactChange(i, e.target.value)}
-                  className="flex-1"
-                />
-                {manualContacts.length > 1 && (
-                  <Button variant="ghost" size="icon" onClick={() => onRemoveContact(i)}>
-                    <X />
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-          {groupRecipients.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              {groupRecipients.length} contact(s) from selected audience
-              {manualContacts.some((c) => c.trim()) && " + manual entries"}
-            </p>
-          )}
-        </div>
+        )}
     </div>
   )
 }
