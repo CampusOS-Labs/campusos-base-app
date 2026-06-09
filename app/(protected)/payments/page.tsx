@@ -86,7 +86,7 @@ export default function PaymentsPage() {
   if (loading) {
     return (
       <div className="flex justify-center pt-6">
-        <div className="w-full max-w-2xl">
+        <div className="w-full max-w-[66.666667%]">
           <h1 className="text-2xl font-semibold">Payments</h1>
           <p className="text-sm text-muted-foreground mt-4">Loading...</p>
         </div>
@@ -97,7 +97,7 @@ export default function PaymentsPage() {
   if (error) {
     return (
       <div className="flex justify-center pt-6">
-        <div className="w-full max-w-2xl">
+        <div className="w-full max-w-[66.666667%]">
           <h1 className="text-2xl font-semibold">Payments</h1>
           <p className="text-sm text-destructive mt-4">{error}</p>
         </div>
@@ -107,7 +107,7 @@ export default function PaymentsPage() {
 
   return (
     <div className="flex justify-center pt-6 pb-12">
-      <div className="w-full max-w-2xl space-y-6">
+      <div className="w-full max-w-[66.666667%] space-y-6">
         <div>
           <h1 className="text-2xl font-semibold">Payments</h1>
           <p className="text-sm text-muted-foreground mt-1">Track unpaid invoices and send payment reminders.</p>

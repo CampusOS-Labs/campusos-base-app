@@ -47,7 +47,7 @@ export default function HomePage() {
   if (loading) {
     return (
       <div className="flex justify-center pt-6">
-        <div className="w-full max-w-2xl">
+        <div className="w-full max-w-[66.666667%]">
           <h1 className="text-2xl font-semibold">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-4">Loading...</p>
         </div>
@@ -58,7 +58,7 @@ export default function HomePage() {
   if (error) {
     return (
       <div className="flex justify-center pt-6">
-        <div className="w-full max-w-2xl">
+        <div className="w-full max-w-[66.666667%]">
           <h1 className="text-2xl font-semibold">Dashboard</h1>
           <p className="text-sm text-destructive mt-4">{error}</p>
         </div>
@@ -74,7 +74,7 @@ export default function HomePage() {
 
   return (
     <div className="flex justify-center pt-6 pb-12">
-      <div className="w-full max-w-2xl space-y-6">
+      <div className="w-full max-w-[66.666667%] space-y-6">
         <div>
           <h1 className="text-2xl font-semibold">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">Overview of your school payments.</p>
@@ -153,7 +153,7 @@ export default function HomePage() {
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <span className="text-sm">{formatCurrencyRaw(inv.totalAmount)}</span>
-                      <Badge variant={inv.status === "paid" ? "success" : "default"}>
+                      <Badge variant={inv.status === "paid" ? "success" : "warning"}>
                         {inv.status === "paid" ? "Paid" : "Pending"}
                       </Badge>
                     </div>
