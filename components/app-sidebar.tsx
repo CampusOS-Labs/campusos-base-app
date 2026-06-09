@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOutIcon } from "lucide-react";
+import { LogOutIcon, Users, History } from "lucide-react";
 
 import { signOut, useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
@@ -22,10 +22,12 @@ import {
 } from "@/components/ui/sidebar";
 
 const nav = [
-  { title: "Home", href: "/home" },
-  { title: "Payments", href: "/payments" },
-  { title: "Announcements", href: "/announcements" },
-  { title: "Logs", href: "/logs" },
+  { title: "Home", href: "/home", icon: null as React.ReactNode | null },
+  { title: "Payments", href: "/payments", icon: null },
+  { title: "Announcements", href: "/announcements", icon: null },
+  { title: "Groups", href: "/groups", icon: <Users className="size-4" /> },
+  { title: "History", href: "/announcements/history", icon: <History className="size-4" /> },
+  { title: "Logs", href: "/logs", icon: null },
 ] as const;
 
 function getInitials(name?: string | null, email?: string | null): string {
@@ -111,7 +113,7 @@ export function AppSidebar({ className, ...props }: React.ComponentProps<typeof 
           {nav.map((item) => (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
-                isActive={pathname === item.href}
+                isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
                 render={<Link href={item.href} />}
                 className={cn(
                   "pl-4 relative hover:bg-zinc-200",
@@ -121,6 +123,7 @@ export function AppSidebar({ className, ...props }: React.ComponentProps<typeof 
                   ],
                 )}
               >
+                {item.icon && <span className="mr-1.5">{item.icon}</span>}
                 {item.title}
               </SidebarMenuButton>
             </SidebarMenuItem>
