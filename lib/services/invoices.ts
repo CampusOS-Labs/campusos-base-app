@@ -1,5 +1,6 @@
 import fs from "fs"
 import path from "path"
+import { cacheLife, cacheTag, revalidateTag } from "next/cache"
 
 export type Invoice = {
   invoiceNumber: string
@@ -42,6 +43,10 @@ function normalizeInvoice(data: Record<string, unknown>): Invoice {
 }
 
 export async function listInvoices(): Promise<Invoice[]> {
+  'use cache'
+  cacheLife('minutes')
+  cacheTag('invoices')
+
   const files = fs.readdirSync(DATA_DIR)
   const jsonFiles = files.filter((f) => f.endsWith(".json"))
 
@@ -57,6 +62,10 @@ export async function listInvoices(): Promise<Invoice[]> {
 export async function getInvoiceById(
   invoiceId: string,
 ): Promise<Invoice> {
+  'use cache'
+  cacheLife('minutes')
+  cacheTag('invoices', `invoice-${invoiceId}`)
+
   const filePath = path.join(DATA_DIR, `${invoiceId}.json`)
 
   if (!fs.existsSync(filePath)) {
@@ -87,6 +96,9 @@ export async function markInvoicePaid(
   }
 
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2))
+
+  revalidateTag('invoices', 'seconds')
+  revalidateTag(`invoice-${invoiceId}`, 'seconds')
 
   return normalizeInvoice(data)
 }

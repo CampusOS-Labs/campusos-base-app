@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 
 export default function ErrorPage({
   error,
-  unstable_retry,
+  reset,
 }: {
   error: Error & { digest?: string };
-  unstable_retry: () => void;
+  reset: () => void;
 }) {
   useEffect(() => {
     console.error(error);
@@ -21,7 +21,7 @@ export default function ErrorPage({
       <p className="max-w-md text-sm text-muted-foreground">
         An unexpected error occurred while loading this page.
       </p>
-      <Button onClick={unstable_retry}>Try again</Button>
+      <Button onClick={reset}>Try again</Button>
     </div>
   );
 }
