@@ -29,6 +29,7 @@ export const auth = betterAuth({
       console.log(`Password reset for ${user.email}`);
     },
   },
+  trustedOrigins: ["http://localhost:3000"],
   rateLimit: {
     enabled: true,
     window: 60,

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Suspense } from "react";
 
 import "./globals.css";
 import { AppShellGate } from "@/components/app-shell-gate";
@@ -32,9 +31,7 @@ export default function RootLayout({
     <html lang="en" className={cn("antialiased", fontMono.variable, "font-sans", geist.variable)}>
       <body>
         <TooltipProvider delay={0}>
-          <Suspense fallback={<>{children}</>}>
-            <AppShellGate>{children}</AppShellGate>
-          </Suspense>
+          <AppShellGate>{children}</AppShellGate>
           <Toaster />
         </TooltipProvider>
       </body>
