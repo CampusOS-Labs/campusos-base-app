@@ -13,7 +13,7 @@ type Props = {
   onAnnTypeChange: (type: string) => void
 }
 
-const TYPES = ["update", "maintenance", "new", "alert", "payment-reminder"] as const
+const TYPES = ["announcement", "activities", "payment-reminder"] as const
 
 export function ComposeForm({
   title,
@@ -29,7 +29,7 @@ export function ComposeForm({
           <label className="text-sm font-medium" htmlFor="ann-title">Title</label>
           <Input
             id="ann-title"
-            placeholder="e.g. New feature rollout"
+            placeholder="e.g. Next Weekend is a Holiday"
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
           />
