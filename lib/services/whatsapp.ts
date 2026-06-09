@@ -219,6 +219,28 @@ export class WhatsAppManager {
     })
   }
 
+  async sendMedia(
+    name: string,
+    number: string,
+    mediatype: "image" | "document" | "video" | "audio",
+    media: string,
+    caption?: string,
+    fileName?: string,
+    delay?: number,
+  ): Promise<void> {
+    const cleanMedia = media.startsWith("data:")
+      ? media.slice(media.indexOf(",") + 1)
+      : media
+    await this.api("POST", `/message/sendMedia/${encodeURIComponent(name)}`, {
+      number,
+      mediatype,
+      media: cleanMedia,
+      caption,
+      fileName,
+      delay: delay ?? 1200,
+    })
+  }
+
   async validateNumbers(
     name: string,
     numbers: string[],

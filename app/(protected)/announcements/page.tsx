@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { WhatsAppPanel } from "./components/whatsapp-panel"
-import { ComposeForm } from "./components/compose-form"
+import { ComposeForm, type SelectedFile } from "./components/compose-form"
 import { RecipientSelector } from "./components/recipient-selector"
 import { SendStatus } from "./components/send-status"
 import {
@@ -54,6 +54,7 @@ const TYPE_LABELS: Record<string, string> = {
   new: "New",
   alert: "Alert",
   "payment-reminder": "Payment Reminder",
+  media: "Media",
 }
 
 function normalizePhone(value: string): string {
@@ -134,6 +135,7 @@ export default function AnnouncementsPage() {
   const [title, setTitle] = useState("")
   const [message, setMessage] = useState("")
   const [annType, setAnnType] = useState("announcement")
+  const [selectedFile, setSelectedFile] = useState<SelectedFile>(null)
   const [manualContacts, setManualContacts] = useState<string[]>([""])
   const [statusSummary, setStatusSummary] = useState("Ready.")
   const [statusIsError, setStatusIsError] = useState(false)
@@ -429,10 +431,15 @@ export default function AnnouncementsPage() {
       setStatus("WhatsApp is not connected. Connect first.", true)
       return
     }
+    const isMedia = annType === "media"
     const titleTrimmed = title.trim()
     const messageTrimmed = message.trim()
-    if (!titleTrimmed || !messageTrimmed) {
+    if (!titleTrimmed || (!messageTrimmed && !isMedia)) {
       setStatus("Title and message are required.", true)
+      return
+    }
+    if (isMedia && !selectedFile) {
+      setStatus("Please select a file to attach.", true)
       return
     }
     const typeLabel = TYPE_LABELS[annType] || "Update"
@@ -500,24 +507,43 @@ export default function AnnouncementsPage() {
       for (let index = 0; index < recipientsToSend.length; index++) {
         const recipient = recipientsToSend[index]
         setStatus(`Sending ${index + 1} of ${recipientsToSend.length}...`)
-        const textLines = [`[${typeLabel}] ${titleTrimmed}`, "", messageTrimmed]
-        if (isPaymentReminder(annType) && recipient.invoices.length > 0) {
-          textLines.push("", "Pending payment link(s):")
-          for (const inv of recipient.invoices) {
-            textLines.push(`- ${inv.studentName} (${inv.invoiceNumber}) ${paymentLinkForInvoice(inv.invoiceNumber)}`)
+
+        if (isMedia && selectedFile) {
+          const caption = [`[${typeLabel}] ${titleTrimmed}`, "", messageTrimmed].join("\n").trim()
+          try {
+            await api("POST", `/api/whatsapp/instance/${INSTANCE_NAME}/send-media`, {
+              number: recipient.phone,
+              mediatype: selectedFile.mediatype,
+              media: selectedFile.base64,
+              caption,
+              fileName: selectedFile.name,
+              delay: 1200,
+            })
+            results.push({ phone: recipient.phone, ok: true })
+          } catch {
+            results.push({ phone: recipient.phone, ok: false })
+          }
+        } else {
+          const textLines = [`[${typeLabel}] ${titleTrimmed}`, "", messageTrimmed]
+          if (isPaymentReminder(annType) && recipient.invoices.length > 0) {
+            textLines.push("", "Pending payment link(s):")
+            for (const inv of recipient.invoices) {
+              textLines.push(`- ${inv.studentName} (${inv.invoiceNumber}) ${paymentLinkForInvoice(inv.invoiceNumber)}`)
+            }
+          }
+          const text = textLines.join("\n")
+          try {
+            await api("POST", `/api/whatsapp/instance/${INSTANCE_NAME}/send`, {
+              number: recipient.phone,
+              text,
+              delay: 1200,
+            })
+            results.push({ phone: recipient.phone, ok: true })
+          } catch {
+            results.push({ phone: recipient.phone, ok: false })
           }
         }
-        const text = textLines.join("\n")
-        try {
-          await api("POST", `/api/whatsapp/instance/${INSTANCE_NAME}/send`, {
-            number: recipient.phone,
-            text,
-            delay: 1200,
-          })
-          results.push({ phone: recipient.phone, ok: true })
-        } catch {
-          results.push({ phone: recipient.phone, ok: false })
-        }
+
         if (index < recipientsToSend.length - 1) {
           await new Promise((r) => setTimeout(r, randomDelay(4000, 9000)))
         }
@@ -589,9 +615,11 @@ export default function AnnouncementsPage() {
               title={title}
               message={message}
               annType={annType}
+              selectedFile={selectedFile}
               onTitleChange={setTitle}
               onMessageChange={setMessage}
               onAnnTypeChange={setAnnType}
+              onFileSelect={setSelectedFile}
             />
 
             <hr className="border-t" />
