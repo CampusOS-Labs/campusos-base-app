@@ -5,7 +5,14 @@ import { headers } from "next/headers";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { kidzeeMundhwaContactGroup, kidzeeMundhwaContact } from "@/lib/db/schema";
+import {
+  kidzeeMundhwaContactGroup,
+  kidzeeMundhwaContact,
+} from "@/lib/db/schema";
+import {
+  getUserGroups as _getUserGroups,
+  getGroupWithContacts as _getGroupWithContacts,
+} from "@/lib/services/groups";
 
 function requireUser(session: Awaited<ReturnType<typeof auth.api.getSession>>) {
   if (!session?.user?.id) throw new Error("Unauthorized");
@@ -76,56 +83,8 @@ export async function deleteGroup(groupId: string) {
   revalidatePath("/announcements");
 }
 
-export async function getUserGroups() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  const user = requireUser(session);
-
-  const groups = await db.query.kidzeeMundhwaContactGroup.findMany({
-    where: eq(kidzeeMundhwaContactGroup.createdBy, user.id),
-    with: {
-      contacts: true,
-    },
-    orderBy: (g, { desc }) => [desc(g.createdAt)],
-  });
-
-  return groups.map((g) => ({
-    id: g.id,
-    name: g.name,
-    description: g.description,
-    contactCount: g.contacts.length,
-    createdAt: g.createdAt.toISOString(),
-  }));
-}
-
-export async function getGroupWithContacts(groupId: string) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  const user = requireUser(session);
-
-  const group = await db.query.kidzeeMundhwaContactGroup.findFirst({
-    where: and(eq(kidzeeMundhwaContactGroup.id, groupId), eq(kidzeeMundhwaContactGroup.createdBy, user.id)),
-    with: {
-      contacts: {
-        orderBy: (c, { asc }) => [asc(c.name)],
-      },
-    },
-  });
-
-  if (!group) throw new Error("Group not found");
-
-  return {
-    id: group.id,
-    name: group.name,
-    description: group.description,
-    contactCount: group.contacts.length,
-    createdAt: group.createdAt.toISOString(),
-    contacts: group.contacts.map((c) => ({
-      id: c.id,
-      name: c.name,
-      phoneNumber: c.phoneNumber,
-      notes: c.notes,
-    })),
-  };
-}
+export const getUserGroups = _getUserGroups;
+export const getGroupWithContacts = _getGroupWithContacts;
 
 export async function addContact(formData: FormData) {
   const session = await auth.api.getSession({ headers: await headers() });

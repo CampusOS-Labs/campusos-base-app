@@ -383,10 +383,13 @@ export default function AnnouncementsPage() {
       const map = new Map<string, Recipient[]>()
 
       try {
-        const res = await fetch("/api/invoices")
-        const json = await res.json()
-        if (json.success) {
-          const invoices: Invoice[] = json.data
+        const [res, userGroups] = await Promise.all([
+          fetch("/api/invoices").then((r) => r.json()),
+          getUserGroups(),
+        ])
+
+        if (res.success) {
+          const invoices: Invoice[] = res.data
           const parentsMap = new Map<string, Recipient>()
           for (const invoice of invoices) {
             const phone = normalizePhone(invoice?.parent?.phone)
@@ -415,13 +418,14 @@ export default function AnnouncementsPage() {
           map.set("unpaid-parents", unpaidParents)
           map.set("all-parents", allParents)
         }
-      } catch {}
 
-      try {
-        const userGroups = await getUserGroups()
-        for (const g of userGroups) {
-          if (g.contactCount === 0) continue
-          const groupData = await getGroupWithContacts(g.id)
+        const groupContactsData = await Promise.all(
+          userGroups.filter((g: { contactCount: number }) => g.contactCount > 0)
+            .map((g: { id: string; name: string; description: string | null }) =>
+              getGroupWithContacts(g.id).then((data) => ({ group: g, data }))
+            )
+        )
+        for (const { group: g, data: groupData } of groupContactsData) {
           const recipients: Recipient[] = groupData.contacts.map((c) => ({
             phone: c.phoneNumber,
             parentName: c.name,

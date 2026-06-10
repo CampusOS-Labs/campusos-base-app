@@ -55,7 +55,7 @@ function rowToInvoice(row: typeof kidzeeMundhwaInvoices.$inferSelect): Invoice {
 }
 
 export async function listInvoices(): Promise<Invoice[]> {
-  'use cache'
+  "use cache"
   cacheLife('minutes')
   cacheTag('invoices')
 
@@ -70,7 +70,7 @@ export async function listInvoices(): Promise<Invoice[]> {
 export async function getInvoiceById(
   invoiceId: string,
 ): Promise<Invoice> {
-  'use cache'
+  "use cache"
   cacheLife('minutes')
   cacheTag('invoices', `invoice-${invoiceId}`)
 

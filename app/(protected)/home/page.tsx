@@ -1,11 +1,9 @@
-"use client"
-
-import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Receipt, AlertCircle, CheckCircle, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { listInvoices } from "@/lib/services/invoices"
 
 type Invoice = {
   invoiceNumber: string
@@ -21,38 +19,14 @@ function formatCurrencyRaw(amount: number) {
   return `₹${amount.toLocaleString("en-IN")}`
 }
 
-export default function HomePage() {
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export default async function HomePage() {
+  let invoices: Invoice[] = []
+  let error: string | null = null
 
-  useEffect(() => {
-    async function fetchInvoices() {
-      try {
-        setLoading(true)
-        setError(null)
-        const res = await fetch("/api/invoices")
-        const json = await res.json()
-        if (!json.success) throw new Error()
-        setInvoices(json.data)
-      } catch {
-        setError("Could not load data.")
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchInvoices()
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="flex justify-center pt-6">
-        <div className="w-full max-w-[66.666667%]">
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-4">Loading...</p>
-        </div>
-      </div>
-    )
+  try {
+    invoices = await listInvoices()
+  } catch {
+    error = "Could not load data."
   }
 
   if (error) {

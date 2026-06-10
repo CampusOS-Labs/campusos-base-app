@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     "stumble-kabob-ensnare.ngrok-free.dev",
   ],
+  images: {
+    remotePatterns: [],
+  },
 };
 
 export default nextConfig;

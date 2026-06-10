@@ -1,10 +1,7 @@
-"use client";
-
-import { useState, useEffect, useCallback } from "react";
 import { History, Megaphone, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getAnnouncementHistory } from "@/lib/actions/announcements";
+import { getAnnouncementHistory } from "@/lib/services/announcements";
 
 type LogEntry = {
   id: string;
@@ -30,19 +27,12 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString();
 }
 
-export default function AnnouncementHistoryPage() {
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+export default async function AnnouncementHistoryPage() {
+  let logs: LogEntry[] = [];
 
-  const load = useCallback(async () => {
-    try {
-      const data = await getAnnouncementHistory();
-      setLogs(data);
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  try {
+    logs = await getAnnouncementHistory();
+  } catch {}
 
   return (
     <div className="flex justify-center pt-6 pb-12">
