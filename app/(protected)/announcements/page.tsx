@@ -639,7 +639,7 @@ export default function AnnouncementsPage() {
     <div className="flex justify-center pt-6 pb-12">
       <div className="w-full max-w-[66.666667%] space-y-4">
         <div>
-          <h1 className="text-2xl font-semibold">New Announcement</h1>
+          <h1 className="text-xl text-muted-foreground">New Announcement</h1>
           <p className="text-sm text-muted-foreground mt-1">Send a WhatsApp message to parents.</p>
         </div>
 

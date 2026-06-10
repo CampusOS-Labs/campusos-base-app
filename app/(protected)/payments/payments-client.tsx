@@ -63,7 +63,7 @@ export function PaymentsClient({ invoices }: { invoices: Invoice[] }) {
     <div className="flex justify-center pt-6 pb-12">
       <div className="w-full max-w-[66.666667%] space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold">Payments</h1>
+          <h1 className="text-xl text-muted-foreground">Payments</h1>
           <p className="text-sm text-muted-foreground mt-1">Track unpaid invoices and send payment reminders.</p>
         </div>
 

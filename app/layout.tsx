@@ -16,8 +16,8 @@ const fontMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "CampusOS",
-    template: "%s | CampusOS",
+    default: "KidZee Mundhwa — CampusOS",
+    template: "%s | KidZee Mundhwa",
   },
   description: "CampusOS base application for school operations and workflows.",
 };

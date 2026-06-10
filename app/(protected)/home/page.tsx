@@ -50,8 +50,7 @@ export default async function HomePage() {
     <div className="flex justify-center pt-6 pb-12">
       <div className="w-full max-w-[66.666667%] space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">Overview of your school payments.</p>
+          <h1 className="text-xl text-muted-foreground">Dashboard</h1>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
