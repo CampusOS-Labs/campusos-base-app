@@ -1,3 +1,11 @@
+# Local Docker setup for Evolution API.
+# Not needed if you're using the Railway-hosted Evolution API
+# (see INSTRUCTION.md for both options).
+#
+# Usage:
+#   docker compose up -d
+#   curl http://localhost:8080/
+
 services:
   postgres:
     image: postgres:16-alpine
