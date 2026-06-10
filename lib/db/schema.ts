@@ -1,2 +1,2 @@
 export * from "./auth-schema";
-export * from "./groups-schema";
+export * from "./kidzee-mundhwa-schema";
