@@ -897,6 +897,7 @@ SECURITY.wiki
 stylelint*
 test*
 tsconfig.json
+!tsconfig.json
 yarn-*.log
 yarn.lock
 !.npmrc
