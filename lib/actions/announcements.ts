@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { announcementLog } from "@/lib/db/schema";
+import { kidzeeMundhwaAnnouncementLog } from "@/lib/db/schema";
 
 function requireUser(session: Awaited<ReturnType<typeof auth.api.getSession>>) {
   if (!session?.user?.id) throw new Error("Unauthorized");
@@ -25,7 +25,7 @@ export async function logAnnouncement(data: {
 
   const id = crypto.randomUUID();
 
-  await db.insert(announcementLog).values({
+  await db.insert(kidzeeMundhwaAnnouncementLog).values({
     id,
     userId: user.id,
     title: data.title,
@@ -44,9 +44,9 @@ export async function getAnnouncementHistory() {
   const session = await auth.api.getSession({ headers: await headers() });
   const user = requireUser(session);
 
-  const logs = await db.query.announcementLog.findMany({
-    where: eq(announcementLog.userId, user.id),
-    orderBy: [desc(announcementLog.createdAt)],
+  const logs = await db.query.kidzeeMundhwaAnnouncementLog.findMany({
+    where: eq(kidzeeMundhwaAnnouncementLog.userId, user.id),
+    orderBy: [desc(kidzeeMundhwaAnnouncementLog.createdAt)],
     limit: 50,
   });
 

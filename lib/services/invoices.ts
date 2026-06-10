@@ -1,6 +1,8 @@
-import fs from "fs"
-import path from "path"
+import { eq } from "drizzle-orm"
 import { cacheLife, cacheTag, revalidateTag } from "next/cache"
+
+import { db } from "@/lib/db"
+import { kidzeeMundhwaInvoices } from "@/lib/db/schema"
 
 export type Invoice = {
   invoiceNumber: string
@@ -30,15 +32,25 @@ type PaymentDetails = {
   source?: string
 }
 
-const DATA_DIR = path.join(process.cwd(), "data", "invoices")
-
-function normalizeInvoice(data: Record<string, unknown>): Invoice {
+function rowToInvoice(row: typeof kidzeeMundhwaInvoices.$inferSelect): Invoice {
   return {
-    ...(data as unknown as Invoice),
-    status:
-      String(data.status || "pending").toLowerCase() === "paid"
-        ? "paid"
-        : "pending",
+    invoiceNumber: row.invoiceNumber,
+    academicYear: row.academicYear,
+    dueDate: row.dueDate,
+    status: row.status as "pending" | "paid",
+    totalAmount: row.totalAmount,
+    student: {
+      id: row.studentId,
+      name: row.studentName,
+      class: row.studentClass,
+      rollNumber: row.rollNumber,
+      admissionNumber: row.admissionNumber,
+    },
+    parent: {
+      name: row.parentName,
+      phone: row.parentPhone,
+      email: row.parentEmail,
+    },
   }
 }
 
@@ -47,16 +59,12 @@ export async function listInvoices(): Promise<Invoice[]> {
   cacheLife('minutes')
   cacheTag('invoices')
 
-  const files = fs.readdirSync(DATA_DIR)
-  const jsonFiles = files.filter((f) => f.endsWith(".json"))
+  const rows = await db
+    .select()
+    .from(kidzeeMundhwaInvoices)
+    .orderBy(kidzeeMundhwaInvoices.invoiceNumber)
 
-  const invoices = jsonFiles.map((fileName) => {
-    const filePath = path.join(DATA_DIR, fileName)
-    const content = fs.readFileSync(filePath, "utf-8")
-    return normalizeInvoice(JSON.parse(content))
-  })
-
-  return invoices.sort((a, b) => a.invoiceNumber.localeCompare(b.invoiceNumber))
+  return rows.map(rowToInvoice)
 }
 
 export async function getInvoiceById(
@@ -66,39 +74,41 @@ export async function getInvoiceById(
   cacheLife('minutes')
   cacheTag('invoices', `invoice-${invoiceId}`)
 
-  const filePath = path.join(DATA_DIR, `${invoiceId}.json`)
+  const [row] = await db
+    .select()
+    .from(kidzeeMundhwaInvoices)
+    .where(eq(kidzeeMundhwaInvoices.invoiceNumber, invoiceId))
+    .limit(1)
 
-  if (!fs.existsSync(filePath)) {
+  if (!row) {
     throw new Error(`Invoice not found: ${invoiceId}`)
   }
 
-  const content = fs.readFileSync(filePath, "utf-8")
-  return normalizeInvoice(JSON.parse(content))
+  return rowToInvoice(row)
 }
 
 export async function markInvoicePaid(
   invoiceId: string,
   paymentDetails: PaymentDetails,
 ): Promise<Invoice> {
-  const filePath = path.join(DATA_DIR, `${invoiceId}.json`)
+  const [row] = await db
+    .update(kidzeeMundhwaInvoices)
+    .set({
+      status: "paid",
+      paymentDetails: {
+        ...paymentDetails,
+        updatedAt: new Date().toISOString(),
+      },
+    })
+    .where(eq(kidzeeMundhwaInvoices.invoiceNumber, invoiceId))
+    .returning()
 
-  if (!fs.existsSync(filePath)) {
+  if (!row) {
     throw new Error(`Invoice not found: ${invoiceId}`)
   }
-
-  const content = fs.readFileSync(filePath, "utf-8")
-  const data = JSON.parse(content)
-
-  data.status = "paid"
-  data.paymentDetails = {
-    ...paymentDetails,
-    updatedAt: new Date().toISOString(),
-  }
-
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2))
 
   revalidateTag('invoices', 'seconds')
   revalidateTag(`invoice-${invoiceId}`, 'seconds')
 
-  return normalizeInvoice(data)
+  return rowToInvoice(row)
 }
