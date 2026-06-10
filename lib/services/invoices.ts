@@ -59,12 +59,16 @@ export async function listInvoices(): Promise<Invoice[]> {
   cacheLife('minutes')
   cacheTag('invoices')
 
-  const rows = await db
-    .select()
-    .from(kidzeeMundhwaInvoices)
-    .orderBy(kidzeeMundhwaInvoices.invoiceNumber)
+  try {
+    const rows = await db
+      .select()
+      .from(kidzeeMundhwaInvoices)
+      .orderBy(kidzeeMundhwaInvoices.invoiceNumber)
 
-  return rows.map(rowToInvoice)
+    return rows.map(rowToInvoice)
+  } catch {
+    return []
+  }
 }
 
 export async function getInvoiceById(
