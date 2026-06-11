@@ -6,6 +6,8 @@ import {
   integer,
   jsonb,
   index,
+  real,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 
@@ -30,6 +32,40 @@ export const kidzeeMundhwaInvoices = pgTable(
   (table) => [
     index("kidzee_mundhwa_invoices_status_idx").on(table.status),
     index("kidzee_mundhwa_invoices_student_id_idx").on(table.studentId),
+  ],
+);
+
+export const kidzeeMundhwaTeacherAttendance = pgTable(
+  "kidzee_mundhwa_teacher_attendance",
+  {
+    id: text("id").primaryKey(),
+    teacherId: text("teacher_id").notNull(),
+    teacherName: text("teacher_name").notNull(),
+    checkedInAt: timestamp("checked_in_at").defaultNow().notNull(),
+    latitude: real("latitude").notNull(),
+    longitude: real("longitude").notNull(),
+    distanceMeters: integer("distance_meters").notNull(),
+    geofencePassed: boolean("geofence_passed").notNull(),
+    manualOverride: boolean("manual_override").notNull().default(false),
+  },
+  (table) => [
+    index("kidzee_mundhwa_ta_teacher_id_idx").on(table.teacherId),
+    index("kidzee_mundhwa_ta_checked_in_at_idx").on(table.checkedInAt),
+  ],
+);
+
+export const kidzeeMundhwaCheckInToken = pgTable(
+  "kidzee_mundhwa_check_in_token",
+  {
+    id: text("id").primaryKey(),
+    teacherId: text("teacher_id").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    usedAt: timestamp("used_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("kidzee_mundhwa_cit_teacher_id_idx").on(table.teacherId),
+    index("kidzee_mundhwa_cit_expires_at_idx").on(table.expiresAt),
   ],
 );
 
