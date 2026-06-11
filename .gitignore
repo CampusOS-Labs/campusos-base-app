@@ -31,7 +31,6 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
 
 # local opencode config (contains machine-specific tokens)
 opencode.json
@@ -46,3 +45,4 @@ opencode.jsonc
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+config.bat

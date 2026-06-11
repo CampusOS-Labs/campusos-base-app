@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 
 const AUTH_ROUTES = ["/login"];
-const PUBLIC_PREFIXES = ["/pay"];
+const PUBLIC_PREFIXES = ["/pay", "/checkin"];
 
 export function AppShellGate({ children }: { children: React.ReactNode }) {
   return (
