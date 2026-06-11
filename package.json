@@ -34,6 +34,7 @@
     "razorpay": "^2.9.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-qr-code": "^2.2.0",
     "recharts": "^3.8.0",
     "shadcn": "^4.10.0",
     "slot-text": "^0.2.2",
