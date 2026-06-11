@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Receipt, AlertCircle, CheckCircle, ArrowRight } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { listInvoices } from "@/lib/services/invoices"
@@ -33,7 +33,7 @@ export default async function HomePage() {
     return (
       <div className="flex justify-center pt-6">
         <div className="w-full max-w-[66.666667%]">
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
+          <h1 className="text-3xl font-heading">Dashboard</h1>
           <p className="text-sm text-destructive mt-4">{error}</p>
         </div>
       </div>
@@ -50,45 +50,22 @@ export default async function HomePage() {
     <div className="flex justify-center pt-6 pb-12">
       <div className="w-full max-w-[66.666667%] space-y-6">
         <div>
-          <h1 className="text-xl text-muted-foreground">Dashboard</h1>
+          <h1 className="text-3xl font-heading">Dashboard</h1>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card size="sm">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm text-muted-foreground">Total Invoices</CardTitle>
-                <Receipt className="size-4 text-muted-foreground" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <span className="text-2xl font-semibold">{invoices.length}</span>
-            </CardContent>
-          </Card>
-          <Card size="sm">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm text-muted-foreground">Pending</CardTitle>
-                <AlertCircle className="size-4 text-yellow-600" />
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-1">
-              <span className="text-2xl font-semibold">{pending.length}</span>
-              <div className="text-xs text-muted-foreground">{formatCurrencyRaw(totalDue)}</div>
-            </CardContent>
-          </Card>
-          <Card size="sm">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm text-muted-foreground">Collected</CardTitle>
-                <CheckCircle className="size-4 text-green-600" />
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-1">
-              <span className="text-2xl font-semibold">{paid.length}</span>
-              <div className="text-xs text-muted-foreground">{formatCurrencyRaw(totalCollected)}</div>
-            </CardContent>
-          </Card>
+        <div className="grid w-full grid-cols-1 sm:grid-cols-3">
+          <div className="aspect-[2/1] rounded-xl border bg-card flex flex-col items-center justify-center gap-1">
+            <span className="text-4xl font-semibold font-heading">{invoices.length}</span>
+            <span className="text-sm text-muted-foreground">Total Invoices</span>
+          </div>
+          <div className="aspect-[2/1] rounded-xl border bg-card flex flex-col items-center justify-center gap-1">
+            <span className="text-4xl font-semibold font-heading">{pending.length}</span>
+            <span className="text-sm text-muted-foreground">Pending</span>
+          </div>
+          <div className="aspect-[2/1] rounded-xl border bg-card flex flex-col items-center justify-center gap-1">
+            <span className="text-4xl font-semibold font-heading">{paid.length}</span>
+            <span className="text-sm text-muted-foreground">Collected</span>
+          </div>
         </div>
 
         <Card>

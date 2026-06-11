@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOutIcon, Users, History } from "lucide-react";
+import { CalendarCheck, ChevronDown, CreditCard, History, House, LogOutIcon, Megaphone, ScrollText, Send, Settings, Users } from "lucide-react";
 
 import { signOut, useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
@@ -19,15 +19,20 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  SidebarRail,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 const nav = [
-  { title: "Home", href: "/home", icon: null as React.ReactNode | null },
-  { title: "Payments", href: "/payments", icon: null },
-  { title: "Announcements", href: "/announcements", icon: null },
-  { title: "Groups", href: "/groups", icon: <Users className="size-4" /> },
-  { title: "History", href: "/announcements/history", icon: <History className="size-4" /> },
-  { title: "Logs", href: "/logs", icon: null },
+  { title: "Home", href: "/home", icon: <House className="size-4" /> },
+  { title: "Attendance", href: "/attendance", icon: <CalendarCheck className="size-4" /> },
 ] as const;
 
 function getInitials(name?: string | null, email?: string | null): string {
@@ -60,6 +65,17 @@ export function AppSidebar({ className, ...props }: React.ComponentProps<typeof 
   const { data: session, isPending } = useSession();
   const user = session?.user;
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [announcementsOpen, setAnnouncementsOpen] = useState(true);
+
+  useEffect(() => {
+    if (
+      pathname === "/announcements" ||
+      pathname.startsWith("/announcements/") ||
+      pathname === "/groups"
+    ) {
+      setAnnouncementsOpen(true);
+    }
+  }, [pathname]);
 
   async function handleSignOut() {
     setIsSigningOut(true);
@@ -75,7 +91,7 @@ export function AppSidebar({ className, ...props }: React.ComponentProps<typeof 
 
   return (
     <Sidebar
-      collapsible="none"
+      collapsible="icon"
       className={cn(
         "sticky top-0 flex h-svh shrink-0 flex-col self-start overflow-hidden border-r border-sidebar-border",
         className,
@@ -129,6 +145,122 @@ export function AppSidebar({ className, ...props }: React.ComponentProps<typeof 
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
+        <SidebarMenu>
+          <Collapsible
+            open={announcementsOpen}
+            onOpenChange={setAnnouncementsOpen}
+          >
+            <SidebarMenuItem>
+              <CollapsibleTrigger
+                render={
+                  <SidebarMenuButton
+                    isActive={
+                      pathname === "/announcements" ||
+                      pathname.startsWith("/announcements/") ||
+                      pathname === "/groups"
+                    }
+                    className={cn(
+                      "pl-4 relative hover:bg-zinc-200",
+                      (pathname === "/announcements" ||
+                        pathname.startsWith("/announcements/") ||
+                        pathname === "/groups") && [
+                        "data-active:!bg-transparent data-active:!text-foreground data-active:font-semibold data-active:hover:!bg-transparent",
+                        "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:bg-foreground before:rounded-full",
+                      ],
+                    )}
+                  />
+                }
+              >
+                <span className="mr-1.5"><Megaphone className="size-4" /></span>
+                <span>Announcements</span>
+                <ChevronDown className="ml-auto size-4 transition-transform data-[open]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton
+                      render={<Link href="/announcements" />}
+                      isActive={pathname === "/announcements"}
+                    >
+                      <Send className="size-4" />
+                      Compose
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton
+                      render={<Link href="/groups" />}
+                      isActive={pathname === "/groups"}
+                    >
+                      <Users className="size-4" />
+                      Groups
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton
+                      render={<Link href="/announcements/history" />}
+                      isActive={pathname === "/announcements/history"}
+                    >
+                      <History className="size-4" />
+                      History
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </SidebarMenuItem>
+          </Collapsible>
+        </SidebarMenu>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={pathname === "/payments"}
+              render={<Link href="/payments" />}
+              className={cn(
+                "pl-4 relative hover:bg-zinc-200",
+                pathname === "/payments" && [
+                  "data-active:!bg-transparent data-active:!text-foreground data-active:font-semibold data-active:hover:!bg-transparent",
+                  "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:bg-foreground before:rounded-full",
+                ],
+              )}
+            >
+              <span className="mr-1.5"><CreditCard className="size-4" /></span>
+              Payments
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={pathname === "/logs"}
+              render={<Link href="/logs" />}
+              className={cn(
+                "pl-4 relative hover:bg-zinc-200",
+                pathname === "/logs" && [
+                  "data-active:!bg-transparent data-active:!text-foreground data-active:font-semibold data-active:hover:!bg-transparent",
+                  "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:bg-foreground before:rounded-full",
+                ],
+              )}
+            >
+              <span className="mr-1.5"><ScrollText className="size-4" /></span>
+              Logs
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <SidebarMenu className="mt-auto">
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={pathname === "/settings"}
+              render={<Link href="/settings" />}
+              className={cn(
+                "pl-4 relative hover:bg-zinc-200",
+                pathname === "/settings" && [
+                  "data-active:!bg-transparent data-active:!text-foreground data-active:font-semibold data-active:hover:!bg-transparent",
+                  "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:bg-foreground before:rounded-full",
+                ],
+              )}
+            >
+              <span className="mr-1.5"><Settings className="size-4" /></span>
+              Settings
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarContent>
       <SidebarFooter className="shrink-0 px-3 pt-2 pb-4">
         <Button
@@ -141,6 +273,7 @@ export function AppSidebar({ className, ...props }: React.ComponentProps<typeof 
           Log out
         </Button>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }

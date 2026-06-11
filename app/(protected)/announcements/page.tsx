@@ -51,12 +51,10 @@ type ConnectionState = "open" | "connecting" | "close" | "unknown"
 const INSTANCE_NAME = "primary"
 
 const TYPE_LABELS: Record<string, string> = {
-  update: "Update",
-  maintenance: "Maintenance",
-  new: "New",
-  alert: "Alert",
-  "payment-reminder": "Payment Reminder",
-  media: "Media",
+  announcement: "📢 Announcement",
+  activities: "🎯 Activities",
+  "payment-reminder": "💰 Payment Reminder",
+  media: "📸 Media",
 }
 
 function normalizePhone(value: string): string {
@@ -75,19 +73,10 @@ function toQrSrc(value: unknown): string | null {
   return null
 }
 
-function extractPairingCode(value: unknown): string | null {
-  if (typeof value !== "string") return null
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  if (!/^[A-Z0-9-]{6,16}$/i.test(trimmed)) return null
-  return trimmed.toUpperCase()
-}
-
-function parseConnectPayload(data: any): { qr: string | null; pairingCode: string | null; state: string } {
+function parseConnectPayload(data: any): { qr: string | null; state: string } {
   const qr = toQrSrc(data?.qr ?? data?.base64 ?? data?.qrcode?.base64 ?? data?.qrcode)
-  const pairingCode = extractPairingCode(data?.pairingCode ?? data?.code)
   const state = String(data?.instance?.state || data?.state || "").toLowerCase()
-  return { qr, pairingCode, state }
+  return { qr, state }
 }
 
 function paymentLinkForInvoice(invoiceId: string): string {
@@ -126,9 +115,6 @@ async function api(method: string, path: string, body?: unknown) {
 export default function AnnouncementsPage() {
   const [connectionState, setConnectionState] = useState<ConnectionState>("unknown")
   const [qrCode, setQrCode] = useState<string | null>(null)
-  const [pairingCode, setPairingCode] = useState<string | null>(null)
-  const [pairingPhone, setPairingPhone] = useState("")
-  const [connectMode, setConnectMode] = useState<"qr" | "code">("qr")
   const [isRunning, setIsRunning] = useState(false)
   const [audienceGroups, setAudienceGroups] = useState<AudienceGroup[]>([])
   const [recipientsByAudience, setRecipientsByAudience] = useState<Map<string, Recipient[]>>(new Map())
@@ -146,6 +132,8 @@ export default function AnnouncementsPage() {
   const pollAttemptsRef = useRef(0)
   const parentsMapRef = useRef<Map<string, Recipient>>(new Map())
   const sendAnywayRef = useRef(false)
+  const pendingSendRef = useRef<{ recipients: Recipient[]; title: string } | null>(null)
+  const [showSendConfirm, setShowSendConfirm] = useState(false)
   const [showMissingAlert, setShowMissingAlert] = useState(false)
   const [missingNumbers, setMissingNumbers] = useState<string[]>([])
 
@@ -159,7 +147,6 @@ export default function AnnouncementsPage() {
     if (normalized === "open") {
       setConnectionState("open")
       setQrCode(null)
-      setPairingCode(null)
       setStatus("WhatsApp connected.")
     } else if (normalized === "connecting") {
       setConnectionState("connecting")
@@ -208,7 +195,6 @@ export default function AnnouncementsPage() {
     pollAttemptsRef.current += 1
     if (pollAttemptsRef.current > 30) {
       setQrCode(null)
-      setPairingCode(null)
       setConnectionState("close")
       setStatus("Connection expired. Try again.", true)
       return
@@ -226,7 +212,6 @@ export default function AnnouncementsPage() {
           return
         }
         setQrCode(null)
-        setPairingCode(null)
         setConnectionState("close")
         setStatus("Connection expired. Try again.", true)
         return
@@ -261,18 +246,8 @@ export default function AnnouncementsPage() {
       const connectPayload = parseConnectPayload(data)
       if (connectPayload.qr) {
         setQrCode(connectPayload.qr)
-        setPairingCode(null)
         setConnectionState("connecting")
         setStatus("Scan the QR code with WhatsApp → Linked Devices.")
-        startPolling()
-        return
-      }
-
-      if (connectPayload.pairingCode) {
-        setPairingCode(connectPayload.pairingCode)
-        setQrCode(null)
-        setConnectionState("connecting")
-        setStatus('Enter the code in WhatsApp → Linked Devices → "Pair with code instead"')
         startPolling()
         return
       }
@@ -297,53 +272,12 @@ export default function AnnouncementsPage() {
     }
   }
 
-  async function onGetPairingCode() {
-    const phone = normalizePhone(pairingPhone)
-    setPairingPhone(phone)
-    if (!phone) {
-      setStatus("Enter a phone number with country code.", true)
-      return
-    }
-    if (phone.length < 10 || phone.length > 15) {
-      setStatus("Phone must include country code (10-15 digits).", true)
-      return
-    }
-    try {
-      setIsRunning(true)
-      await api("POST", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME }).catch(() => {})
-      const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/connect?number=${encodeURIComponent(phone)}`)
-      const connectPayload = parseConnectPayload(data)
-      if (connectPayload.pairingCode) {
-        setPairingCode(connectPayload.pairingCode)
-        setQrCode(null)
-        setConnectionState("connecting")
-        setStatus('Enter the code in WhatsApp → Linked Devices → "Pair with code instead"')
-        startPolling()
-      } else if (connectPayload.qr) {
-        setQrCode(connectPayload.qr)
-        setPairingCode(null)
-        setConnectionState("connecting")
-        setStatus("Scan the QR code with WhatsApp → Linked Devices.")
-        startPolling()
-      } else if (connectPayload.state === "open") {
-        applyConnectionState("open")
-      } else {
-        setStatus("Failed to get pairing code.", true)
-      }
-    } catch {
-      setStatus("Failed to get pairing code. Try again.", true)
-    } finally {
-      setIsRunning(false)
-    }
-  }
-
   async function onLogout() {
     try {
       setIsRunning(true)
       await api("DELETE", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME })
       setConnectionState("close")
       setQrCode(null)
-      setPairingCode(null)
       setStatus("WhatsApp disconnected.")
     } catch {
       // silently fail
@@ -480,7 +414,7 @@ export default function AnnouncementsPage() {
       setStatus("Please select a file to attach.", true)
       return
     }
-    const typeLabel = TYPE_LABELS[annType] || "Update"
+    const typeLabel = TYPE_LABELS[annType]
     const manualRecipients: Recipient[] = manualContacts
       .filter((c) => normalizePhone(c))
       .map((c) => {
@@ -520,7 +454,23 @@ export default function AnnouncementsPage() {
       }
     }
     sendAnywayRef.current = false
-    if (!window.confirm(`Send "${titleTrimmed}" to ${allRecipients.length} contact(s)?`)) return
+    pendingSendRef.current = { recipients: allRecipients, title: titleTrimmed }
+    setShowSendConfirm(true)
+    return
+  }
+
+  async function executeSend() {
+    if (!pendingSendRef.current) {
+      setShowSendConfirm(false)
+      return
+    }
+
+    const { recipients: allRecipients, title: titleTrimmed } = pendingSendRef.current
+    setShowSendConfirm(false)
+    pendingSendRef.current = null
+    const isMedia = annType === "media"
+    const typeLabel = TYPE_LABELS[annType]
+    const messageTrimmed = message.trim()
     setSending(true)
     setStatus("Sending announcement...")
     try {
@@ -547,7 +497,7 @@ export default function AnnouncementsPage() {
         setStatus(`Sending ${index + 1} of ${recipientsToSend.length}...`)
 
         if (isMedia && selectedFile) {
-          const caption = [`[${typeLabel}] ${titleTrimmed}`, "", messageTrimmed].join("\n").trim()
+          const caption = [`${typeLabel}: ${titleTrimmed}`, "", messageTrimmed].join("\n").trim()
           try {
             await api("POST", `/api/whatsapp/instance/${INSTANCE_NAME}/send-media`, {
               number: recipient.phone,
@@ -562,7 +512,7 @@ export default function AnnouncementsPage() {
             results.push({ phone: recipient.phone, ok: false })
           }
         } else {
-          const textLines = [`[${typeLabel}] ${titleTrimmed}`, "", messageTrimmed]
+          const textLines = [`${typeLabel}: ${titleTrimmed}`, "", messageTrimmed]
           if (isPaymentReminder(annType) && recipient.invoices.length > 0) {
             textLines.push("", "Pending payment link(s):")
             for (const inv of recipient.invoices) {
@@ -597,6 +547,12 @@ export default function AnnouncementsPage() {
         groupId: selectedAudience.startsWith("group-") ? selectedAudience.slice(6) : null,
         audienceLabel: audienceGroups.find((g) => g.id === selectedAudience)?.label || null,
       }).catch(() => {})
+
+      setTitle("")
+      setMessage("")
+      setAnnType("announcement")
+      setSelectedFile(null)
+      setManualContacts([""])
 
       if (failedCount > 0) {
         setStatus(`Sent to ${sentCount} contact(s). ${failedCount} failed.`, true)
@@ -646,15 +602,9 @@ export default function AnnouncementsPage() {
         <WhatsAppPanel
           connectionState={connectionState}
           qrCode={qrCode}
-          pairingCode={pairingCode}
-          pairingPhone={pairingPhone}
-          connectMode={connectMode}
           isRunning={isRunning}
           onLogout={onLogout}
           onConnect={onConnect}
-          onGetPairingCode={onGetPairingCode}
-          onPairingPhoneChange={setPairingPhone}
-          onConnectModeChange={setConnectMode}
         />
 
         <Card>
@@ -720,6 +670,25 @@ export default function AnnouncementsPage() {
               }}
             >
               Send Anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSendConfirm} onOpenChange={setShowSendConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Send</DialogTitle>
+            <DialogDescription>
+              Send "{pendingSendRef.current?.title}" to {pendingSendRef.current?.recipients.length} contact(s)?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSendConfirm(false)}>
+              Cancel
+            </Button>
+            <Button onClick={executeSend}>
+              Send
             </Button>
           </DialogFooter>
         </DialogContent>

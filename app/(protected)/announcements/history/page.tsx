@@ -14,13 +14,10 @@ type LogEntry = {
 };
 
 const TYPE_LABELS: Record<string, string> = {
-  update: "Update",
-  maintenance: "Maintenance",
-  new: "New",
-  alert: "Alert",
-  "payment-reminder": "Payment Reminder",
-  media: "Media",
-  announcement: "Announcement",
+  announcement: "📢 Announcement",
+  activities: "🎯 Activities",
+  "payment-reminder": "💰 Payment Reminder",
+  media: "📸 Media",
 };
 
 function formatDate(iso: string) {

@@ -1,24 +1,20 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
 import { EvolutionHttpError, whatsAppManager } from "@/lib/services/whatsapp"
 
 export async function GET(
-  req: NextRequest,
+  _req: Request,
   { params }: { params: Promise<{ name: string }> },
 ) {
   try {
     const { name } = await params
-    const number = req.nextUrl.searchParams.get("number") || undefined
-    const result = await whatsAppManager.connect(name, number)
+    const result = await whatsAppManager.connect(name)
     const qr = result.base64 || null
-    const pairingCode = result.code || null
 
     return NextResponse.json({
       success: true,
       qr,
-      pairingCode,
       base64: qr,
-      code: pairingCode,
       instance: { state: result.state },
     })
   } catch (err) {

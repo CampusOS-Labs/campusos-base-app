@@ -56,16 +56,6 @@ export class WhatsAppManager {
     return null
   }
 
-  private extractPairingCode(data: any): string | null {
-    const candidates = [data?.pairingCode, data?.pairing_code, data?.code]
-    for (const candidate of candidates) {
-      if (typeof candidate !== "string" || !candidate.trim()) continue
-      const value = candidate.trim()
-      if (/^[A-Z0-9-]{6,16}$/i.test(value)) return value.toUpperCase()
-    }
-    return null
-  }
-
   private isAlreadyExistsError(error: unknown): boolean {
     if (!(error instanceof EvolutionHttpError)) return false
     if (![400, 403, 409].includes(error.status)) return false
@@ -148,25 +138,11 @@ export class WhatsAppManager {
 
   async connect(
     name: string,
-    phoneNumber?: string,
-  ): Promise<{ base64?: string; code?: string; state: string }> {
+  ): Promise<{ base64?: string; state: string }> {
     await this.getOrCreateInstance(name)
 
     const inst = this.instances.get(name)
     if (!inst) return { state: "close" }
-
-    if (phoneNumber) {
-      const data = await this.api(
-        "GET",
-        `/instance/connect/${encodeURIComponent(name)}?number=${encodeURIComponent(phoneNumber)}`,
-      )
-      const pairingCode = this.extractPairingCode(data)
-      if (!pairingCode) {
-        throw new Error("Evolution API returned no pairing code")
-      }
-      inst.state = "connecting"
-      return { code: pairingCode, state: "connecting" }
-    }
 
     const delays = [1000, 2000]
     for (let i = 0; i < 3; i++) {
@@ -182,12 +158,6 @@ export class WhatsAppManager {
         if (qr) {
           inst.state = "connecting"
           return { base64: qr, state: "connecting" }
-        }
-
-        const pairingCode = this.extractPairingCode(data)
-        if (pairingCode) {
-          inst.state = "connecting"
-          return { code: pairingCode, state: "connecting" }
         }
 
         const rawState = data?.instance?.state as string | undefined

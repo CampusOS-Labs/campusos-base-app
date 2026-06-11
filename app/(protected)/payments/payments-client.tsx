@@ -2,7 +2,6 @@
 
 import { useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Copy, Bell } from "lucide-react"
 
 type Invoice = {
@@ -63,27 +62,19 @@ export function PaymentsClient({ invoices }: { invoices: Invoice[] }) {
     <div className="flex justify-center pt-6 pb-12">
       <div className="w-full max-w-[66.666667%] space-y-6">
         <div>
-          <h1 className="text-xl text-muted-foreground">Payments</h1>
+          <h1 className="text-3xl font-heading">Payments</h1>
           <p className="text-sm text-muted-foreground mt-1">Track unpaid invoices and send payment reminders.</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Card size="sm">
-            <CardHeader>
-              <CardTitle className="text-sm text-muted-foreground">Pending Payments</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <span className="text-2xl font-semibold">{unpaid.length}</span>
-            </CardContent>
-          </Card>
-          <Card size="sm">
-            <CardHeader>
-              <CardTitle className="text-sm text-muted-foreground">Total Due</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <span className="text-2xl font-semibold">{formatCurrency(totalDue)}</span>
-            </CardContent>
-          </Card>
+        <div className="grid w-full grid-cols-1 sm:grid-cols-2">
+          <div className="aspect-[2/1] rounded-xl border bg-card flex flex-col items-center justify-center gap-1">
+            <span className="text-4xl font-semibold font-heading">{unpaid.length}</span>
+            <span className="text-sm text-muted-foreground">Pending Payments</span>
+          </div>
+          <div className="aspect-[2/1] rounded-xl border bg-card flex flex-col items-center justify-center gap-1">
+            <span className="text-4xl font-semibold font-heading">{formatCurrency(totalDue)}</span>
+            <span className="text-sm text-muted-foreground">Total Due</span>
+          </div>
         </div>
 
         {unpaid.length === 0 ? (

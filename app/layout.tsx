@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Crimson_Text, Inter } from "next/font/google";
 
 import "./globals.css";
 import { AppShellGate } from "@/components/app-shell-gate";
@@ -7,11 +7,15 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
-
-const fontMono = Geist_Mono({
+const crimsonText = Crimson_Text({
+  weight: ["400", "600", "700"],
   subsets: ["latin"],
-  variable: "--font-mono",
+  variable: "--font-heading",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
 });
 
 export const metadata: Metadata = {
@@ -28,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("antialiased", fontMono.variable, "font-sans", geist.variable)}>
+    <html lang="en" className={cn("antialiased", inter.variable, crimsonText.variable)}>
       <body>
         <TooltipProvider delay={0}>
           <AppShellGate>{children}</AppShellGate>

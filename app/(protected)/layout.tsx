@@ -25,7 +25,7 @@ async function AuthGuard({ children }: { children: React.ReactNode }) {
     <div>
       <div className="flex justify-center pt-6">
         <div className="w-full max-w-[66.666667%]">
-          <h2 className="text-2xl font-semibold">Welcome to Kidzee, Mundhwa</h2>
+          <h2 className="text-3xl font-semibold font-heading">Welcome to Kidzee, Mundhwa</h2>
         </div>
       </div>
       {children}
