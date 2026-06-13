@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef } from "react"
+import Image from "next/image"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
@@ -113,10 +114,12 @@ export function ComposeForm({
             {selectedFile ? (
               <div className="space-y-2">
                 {selectedFile.mediatype === "image" && selectedFile.preview && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <Image
                     src={selectedFile.preview}
                     alt="Preview"
+                    width={320}
+                    height={192}
+                    unoptimized
                     className="max-h-48 rounded object-contain border"
                   />
                 )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -107,6 +107,29 @@ function NavItem({ href, title, icon, isActive }: NavItemProps) {
 }
 
 export function AppSidebar({ className, ...props }: React.ComponentProps<typeof Sidebar>) {
+  return (
+    <Suspense
+      fallback={
+        <Sidebar collapsible="icon" className={cn(className)} {...props}>
+          <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
+            <Skeleton className="h-8 w-32" />
+          </SidebarHeader>
+          <SidebarContent>
+            <div className="space-y-2 p-4">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          </SidebarContent>
+        </Sidebar>
+      }
+    >
+      <AppSidebarInner className={className} {...props} />
+    </Suspense>
+  );
+}
+
+function AppSidebarInner({ className, ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session, isPending } = useSession();

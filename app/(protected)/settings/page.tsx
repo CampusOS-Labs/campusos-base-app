@@ -11,6 +11,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader, PageSection, PageShell } from "@/components/page-layout";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Settings",
+  description: "CampusOS account and school settings.",
+};
 
 export default function SettingsPage() {
   return (

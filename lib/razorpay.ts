@@ -13,6 +13,6 @@ export const razorpay = new Razorpay({
   key_secret: RAZORPAY_KEY_SECRET,
 })
 
-export function getRazorpayKeyId() {
-  return RAZORPAY_KEY_ID
+export function getRazorpayKeyId(): string {
+  return RAZORPAY_KEY_ID as string
 }

@@ -1,4 +1,5 @@
 import { History, Megaphone, Users } from "lucide-react";
+import type { Metadata } from "next";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, PageSection, PageShell } from "@/components/page-layout";
 import { getAnnouncementHistory } from "@/lib/services/announcements";
@@ -23,6 +24,11 @@ const TYPE_LABELS: Record<string, string> = {
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString();
 }
+
+export const metadata: Metadata = {
+  title: "Announcement history",
+  description: "Past WhatsApp announcements sent to parents.",
+};
 
 export default async function AnnouncementHistoryPage() {
   let logs: LogEntry[] = [];

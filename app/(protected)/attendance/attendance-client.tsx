@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import QRCode from "react-qr-code";
-import { Copy, RefreshCw } from "lucide-react";
-import { toast } from "sonner";
+import { RefreshCw } from "lucide-react";
 
 import {
   DataTable,
@@ -13,7 +12,6 @@ import {
   PageShell,
 } from "@/components/page-layout";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 
 type AttendanceRecord = {
   id: string;
@@ -48,10 +46,10 @@ function formatTime(iso: string) {
   });
 }
 
-export function AttendanceClient() {
-  const [loading, setLoading] = useState(true);
+export function AttendanceClient({ initialSummary }: { initialSummary: Summary }) {
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const [summary, setSummary] = useState<Summary>(initialSummary);
   const [url, setUrl] = useState("");
 
   const fetchSummary = useCallback(async () => {
@@ -71,29 +69,11 @@ export function AttendanceClient() {
 
   useEffect(() => {
     setUrl(checkInUrl());
-    fetchSummary();
-  }, [fetchSummary]);
+  }, []);
 
-  const copyLink = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success("Check-in link copied");
-    } catch {
-      toast.error("Could not copy link");
-    }
-  }, [url]);
-
-  if (loading && !summary) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner className="size-8" />
-      </div>
-    );
-  }
-
-  const records = summary?.records ?? [];
-  const pending = summary?.pending ?? [];
-  const totalTeachers = summary?.teachers.length ?? 0;
+  const records = summary.records;
+  const pending = summary.pending;
+  const totalTeachers = summary.teachers.length;
 
   return (
     <PageShell>

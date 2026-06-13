@@ -182,8 +182,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         </CardContent>
       </Card>
       <FieldDescription className="px-6 text-center">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a> and{" "}
-        <a href="#">Privacy Policy</a>.
+        By clicking continue, you agree to our <span className="underline">Terms of Service</span> and{" "}
+        <span className="underline">Privacy Policy</span>.
       </FieldDescription>
     </div>
   );

@@ -15,15 +15,15 @@ export function HomeQuickActions() {
       aria-label="Quick actions"
       className="flex flex-wrap items-center justify-center gap-2"
     >
-      <Button render={<Link href="/announcements" />}>
+      <Button nativeButton={false} render={<Link href="/announcements" />}>
         <PaperPlaneTiltIcon data-icon="inline-start" />
         Send announcement
       </Button>
-      <Button variant="ghost" render={<Link href="/attendance" />}>
+      <Button nativeButton={false} variant="ghost" render={<Link href="/attendance" />}>
         <CalendarCheckIcon data-icon="inline-start" />
         Attendance
       </Button>
-      <Button variant="ghost" render={<Link href="/payments" />}>
+      <Button nativeButton={false} variant="ghost" render={<Link href="/payments" />}>
         <CreditCardIcon data-icon="inline-start" />
         Payments
       </Button>

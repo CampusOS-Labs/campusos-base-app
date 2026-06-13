@@ -1,4 +1,10 @@
 import { PageHeader, PageShell } from "@/components/page-layout";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Activity logs",
+  description: "A record of actions taken across CampusOS.",
+};
 
 export default function LogsPage() {
   return (

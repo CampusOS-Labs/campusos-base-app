@@ -1,5 +1,6 @@
 import { headers } from "next/headers"
 import Link from "next/link"
+import type { Metadata } from "next"
 
 import { Badge } from "@/components/ui/badge"
 import { MetricStrip, PageHeader, PageSection, PageShell } from "@/components/page-layout"
@@ -7,6 +8,11 @@ import { ORG_DISPLAY_NAME } from "@/lib/constants"
 import { auth } from "@/lib/auth"
 import { listInvoices } from "@/lib/services/invoices"
 import { HomeQuickActions } from "./home-quick-actions"
+
+export const metadata: Metadata = {
+  title: "Home",
+  description: "CampusOS dashboard for Kidzee Mundhwa.",
+}
 
 type Invoice = {
   invoiceNumber: string
