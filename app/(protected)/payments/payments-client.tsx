@@ -1,8 +1,16 @@
 "use client"
 
 import { useCallback } from "react"
+import { Bell, Copy } from "lucide-react"
+
+import {
+  DataTable,
+  MetricStrip,
+  PageHeader,
+  PageSection,
+  PageShell,
+} from "@/components/page-layout"
 import { Button } from "@/components/ui/button"
-import { Copy, Bell } from "lucide-react"
 
 type Invoice = {
   invoiceNumber: string
@@ -12,15 +20,6 @@ type Invoice = {
   totalAmount: number
   student: { id: string; name: string; class: string }
   parent: { name: string; phone: string; email: string }
-}
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount)
 }
 
 function formatDate(value: string) {
@@ -59,68 +58,68 @@ export function PaymentsClient({ invoices }: { invoices: Invoice[] }) {
   const totalDue = unpaid.reduce((sum, inv) => sum + inv.totalAmount, 0)
 
   return (
-    <div className="flex justify-center pt-6 pb-12">
-      <div className="w-full max-w-[66.666667%] space-y-6">
-        <div>
-          <h1 className="text-3xl font-heading">Payments</h1>
-          <p className="text-sm text-muted-foreground mt-1">Track unpaid invoices and send payment reminders.</p>
-        </div>
+    <PageShell>
+      <PageHeader
+        title="Payments"
+        description="Track unpaid invoices and send payment reminders."
+      />
 
-        <div className="grid w-full grid-cols-1 sm:grid-cols-2">
-          <div className="aspect-[2/1] rounded-xl border bg-card flex flex-col items-center justify-center gap-1">
-            <span className="text-4xl font-semibold font-heading">{unpaid.length}</span>
-            <span className="text-sm text-muted-foreground">Pending Payments</span>
-          </div>
-          <div className="aspect-[2/1] rounded-xl border bg-card flex flex-col items-center justify-center gap-1">
-            <span className="text-4xl font-semibold font-heading">{formatCurrency(totalDue)}</span>
-            <span className="text-sm text-muted-foreground">Total Due</span>
-          </div>
-        </div>
+      <MetricStrip
+        metrics={[
+          { value: unpaid.length, label: "pending" },
+          { value: formatCurrencyRaw(totalDue), label: "total due" },
+        ]}
+      />
 
+      <PageSection title="Unpaid invoices">
         {unpaid.length === 0 ? (
           <p className="text-sm text-muted-foreground">No unpaid invoices right now.</p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 text-left">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Student</th>
-                  <th className="px-4 py-3 font-medium">Parent</th>
-                  <th className="px-4 py-3 font-medium text-right">Amount</th>
-                  <th className="px-4 py-3 font-medium">Due</th>
-                  <th className="px-4 py-3 font-medium text-right">Actions</th>
+          <DataTable>
+            <thead className="border-b border-border text-left">
+              <tr>
+                <th className="px-0 py-3 pr-4 font-medium">Student</th>
+                <th className="px-4 py-3 font-medium">Parent</th>
+                <th className="px-4 py-3 text-right font-medium">Amount</th>
+                <th className="px-4 py-3 font-medium">Due</th>
+                <th className="py-3 pl-4 text-right font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {unpaid.map((inv) => (
+                <tr key={inv.invoiceNumber} className="hover:bg-muted/30">
+                  <td className="py-3 pr-4">
+                    <div className="font-medium">{inv.student.name}</div>
+                    <div className="text-xs text-muted-foreground">{inv.student.class}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{inv.parent.name}</div>
+                    <div className="text-xs text-muted-foreground">{inv.parent.phone}</div>
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium tabular-nums">
+                    {formatCurrencyRaw(inv.totalAmount)}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatDate(inv.dueDate)}</td>
+                  <td className="py-3 pl-4 text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        onClick={() => copyLink(inv.invoiceNumber)}
+                      >
+                        <Copy /> Copy link
+                      </Button>
+                      <Button size="xs" onClick={() => remindToPay(inv.invoiceNumber)}>
+                        <Bell /> Remind
+                      </Button>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y">
-                {unpaid.map((inv) => (
-                  <tr key={inv.invoiceNumber} className="hover:bg-muted/30">
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{inv.student.name}</div>
-                      <div className="text-xs text-muted-foreground">{inv.student.class}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{inv.parent.name}</div>
-                      <div className="text-xs text-muted-foreground">{inv.parent.phone}</div>
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium">{formatCurrencyRaw(inv.totalAmount)}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{formatDate(inv.dueDate)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="outline" size="xs" onClick={() => copyLink(inv.invoiceNumber)}>
-                          <Copy /> Copy Link
-                        </Button>
-                        <Button size="xs" onClick={() => remindToPay(inv.invoiceNumber)}>
-                          <Bell /> Remind
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </DataTable>
         )}
-      </div>
-    </div>
+      </PageSection>
+    </PageShell>
   )
 }

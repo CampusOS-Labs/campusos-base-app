@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { PageHeader, PageShell } from "@/components/page-layout"
 import { WhatsAppPanel } from "./components/whatsapp-panel"
 import { ComposeForm, type SelectedFile } from "./components/compose-form"
 import { RecipientSelector } from "./components/recipient-selector"
@@ -592,57 +592,53 @@ export default function AnnouncementsPage() {
   }, [recipientsByAudience, annType]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="flex justify-center pt-6 pb-12">
-      <div className="w-full max-w-[66.666667%] space-y-4">
-        <div>
-          <h1 className="text-xl text-muted-foreground">New Announcement</h1>
-          <p className="text-sm text-muted-foreground mt-1">Send a WhatsApp message to parents.</p>
-        </div>
+    <PageShell className="space-y-8">
+      <PageHeader
+        title="New announcement"
+        description="Send a WhatsApp message to parents."
+      />
 
-        <WhatsAppPanel
-          connectionState={connectionState}
-          qrCode={qrCode}
-          isRunning={isRunning}
-          onLogout={onLogout}
-          onConnect={onConnect}
+      <WhatsAppPanel
+        connectionState={connectionState}
+        qrCode={qrCode}
+        isRunning={isRunning}
+        onLogout={onLogout}
+        onConnect={onConnect}
+      />
+
+      <div className="flex flex-col gap-5 border-t border-border pt-8">
+        <ComposeForm
+          title={title}
+          message={message}
+          annType={annType}
+          selectedFile={selectedFile}
+          onTitleChange={setTitle}
+          onMessageChange={setMessage}
+          onAnnTypeChange={setAnnType}
+          onFileSelect={setSelectedFile}
         />
 
-        <Card>
-          <CardContent className="space-y-5 pt-6">
-            <ComposeForm
-              title={title}
-              message={message}
-              annType={annType}
-              selectedFile={selectedFile}
-              onTitleChange={setTitle}
-              onMessageChange={setMessage}
-              onAnnTypeChange={setAnnType}
-              onFileSelect={setSelectedFile}
-            />
+        <hr className="border-t border-border" />
 
-            <hr className="border-t" />
+        <RecipientSelector
+          audienceGroups={audienceGroups}
+          selectedAudience={selectedAudience}
+          groupRecipients={groupRecipients}
+          manualContacts={manualContacts}
+          onAudienceChange={handleAudienceChange}
+          onManualContactChange={handleManualContactChange}
+          onAddContact={handleAddContact}
+          onRemoveContact={handleRemoveContact}
+        />
 
-            <RecipientSelector
-              audienceGroups={audienceGroups}
-              selectedAudience={selectedAudience}
-              groupRecipients={groupRecipients}
-              manualContacts={manualContacts}
-              onAudienceChange={handleAudienceChange}
-              onManualContactChange={handleManualContactChange}
-              onAddContact={handleAddContact}
-              onRemoveContact={handleRemoveContact}
-            />
+        <hr className="border-t border-border" />
 
-            <hr className="border-t" />
-
-            <SendStatus
-              statusSummary={statusSummary}
-              statusIsError={statusIsError}
-              sending={sending}
-              onSend={onSend}
-            />
-          </CardContent>
-        </Card>
+        <SendStatus
+          statusSummary={statusSummary}
+          statusIsError={statusIsError}
+          sending={sending}
+          onSend={onSend}
+        />
       </div>
 
       <Dialog open={showMissingAlert} onOpenChange={setShowMissingAlert}>
@@ -693,6 +689,6 @@ export default function AnnouncementsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   )
 }

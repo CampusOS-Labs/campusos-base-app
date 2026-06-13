@@ -2,8 +2,9 @@
 
 import { useState, useCallback } from "react";
 import { Plus, Users, Pencil, Trash2, Phone, UserPlus } from "lucide-react";
+import { PageHeader, PageShell } from "@/components/page-layout";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -58,6 +59,8 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
   const [addContactNotes, setAddContactNotes] = useState("");
 
   const [busy, setBusy] = useState(false);
+  const [deleteGroupId, setDeleteGroupId] = useState<string | null>(null);
+  const [deleteContactId, setDeleteContactId] = useState<string | null>(null);
 
   const loadGroupContacts = useCallback(async (groupId: string) => {
     try {
@@ -113,7 +116,6 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
   }
 
   async function handleDeleteGroup(groupId: string) {
-    if (!confirm("Delete this group and all its contacts?")) return;
     try {
       await deleteGroup(groupId);
       if (selectedGroup === groupId) {
@@ -122,6 +124,37 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
       }
       window.location.reload();
     } catch {}
+  }
+
+  async function handleDeleteContact(contactId: string) {
+    try {
+      await deleteContact(contactId);
+      if (selectedGroup) {
+        window.location.reload();
+      }
+    } catch {}
+  }
+
+  async function confirmDeleteGroup() {
+    if (!deleteGroupId) return;
+    setBusy(true);
+    try {
+      await handleDeleteGroup(deleteGroupId);
+      setDeleteGroupId(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmDeleteContact() {
+    if (!deleteContactId) return;
+    setBusy(true);
+    try {
+      await handleDeleteContact(deleteContactId);
+      setDeleteContactId(null);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleAddContact() {
@@ -143,140 +176,112 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
     setBusy(false);
   }
 
-  async function handleDeleteContact(contactId: string) {
-    if (!confirm("Remove this contact?")) return;
-    try {
-      await deleteContact(contactId);
-      if (selectedGroup) {
-        window.location.reload();
-      }
-    } catch {}
-  }
-
   return (
-    <div className="flex justify-center pt-6 pb-12">
-      <div className="w-full max-w-[66.666667%] space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Groups</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Manage contact groups for sending announcements.
-            </p>
-          </div>
+    <PageShell className="space-y-8">
+      <PageHeader
+        title="Groups"
+        description="Manage contact groups for sending announcements."
+        actions={
           <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus /> New Group
+            <Plus /> New group
           </Button>
-        </div>
+        }
+      />
 
-        <div className="grid gap-3">
-          {groups.map((group) => (
-            <Card
-              key={group.id}
-              className={`cursor-pointer transition-colors ${selectedGroup === group.id ? "ring-2 ring-primary" : ""}`}
+      <div className="divide-y border-t border-border">
+        {groups.map((group) => (
+          <div
+            key={group.id}
+            className={selectedGroup === group.id ? "bg-muted/20" : undefined}
+          >
+            <div
+              className="flex cursor-pointer items-center justify-between gap-4 py-4"
+              onClick={() => toggleGroup(group.id)}
             >
-              <CardHeader className="pb-3">
-                <div
-                  className="flex items-center justify-between"
-                  onClick={() => toggleGroup(group.id)}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-                      <Users className="size-5" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base">{group.name}</CardTitle>
-                      {group.description && (
-                        <p className="text-xs text-muted-foreground">
-                          {group.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">
-                      {group.contactCount} contacts
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEditDialog(group);
-                      }}
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteGroup(group.id);
-                      }}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
+              <div className="flex min-w-0 items-center gap-3">
+                <Users className="size-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <p className="font-medium">{group.name}</p>
+                  {group.description ? (
+                    <p className="text-xs text-muted-foreground">{group.description}</p>
+                  ) : null}
                 </div>
-              </CardHeader>
-              {selectedGroup === group.id && (
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium">Contacts</h3>
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        onClick={() => setShowAddContactDialog(true)}
-                      >
-                        <UserPlus /> Add Contact
-                      </Button>
-                    </div>
-                    {groupContacts.length === 0 ? (
-                      <p className="py-2 text-sm text-muted-foreground">
-                        No contacts yet.
-                      </p>
-                    ) : (
-                      <div className="divide-y">
-                        {groupContacts.map((contact) => (
-                          <div
-                            key={contact.id}
-                            className="flex items-center justify-between py-2"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Phone className="size-4 text-muted-foreground" />
-                              <div>
-                                <p className="text-sm font-medium">
-                                  {contact.name}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {contact.phoneNumber}
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteContact(contact.id)}
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-          ))}
-          {groups.length === 0 && (
-            <div className="py-12 text-center text-muted-foreground">
-              <Users className="mx-auto mb-3 size-12 opacity-50" />
-              <p>No groups yet. Create one to get started.</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Badge variant="secondary">{group.contactCount} contacts</Badge>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEditDialog(group);
+                  }}
+                >
+                  <Pencil className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteGroupId(group.id);
+                  }}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
             </div>
-          )}
-        </div>
+            {selectedGroup === group.id ? (
+              <div className="space-y-3 border-t border-border pb-5 pl-7">
+                <div className="flex items-center justify-between pt-4">
+                  <h3 className="text-sm font-medium">Contacts</h3>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onClick={() => setShowAddContactDialog(true)}
+                  >
+                    <UserPlus /> Add contact
+                  </Button>
+                </div>
+                {groupContacts.length === 0 ? (
+                  <p className="py-2 text-sm text-muted-foreground">No contacts yet.</p>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {groupContacts.map((contact) => (
+                      <div
+                        key={contact.id}
+                        className="flex items-center justify-between py-2.5"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Phone className="size-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">{contact.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {contact.phoneNumber}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeleteContactId(contact.id)}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        ))}
+        {groups.length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground">
+            <Users className="mx-auto mb-3 size-12 opacity-50" />
+            <p>No groups yet. Create one to get started.</p>
+          </div>
+        ) : null}
       </div>
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -435,6 +440,32 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+      <ConfirmDialog
+        open={deleteGroupId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteGroupId(null);
+        }}
+        title="Delete group?"
+        description="This will permanently delete the group and all of its contacts."
+        confirmLabel="Delete group"
+        destructive
+        busy={busy}
+        onConfirm={confirmDeleteGroup}
+      />
+
+      <ConfirmDialog
+        open={deleteContactId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteContactId(null);
+        }}
+        title="Remove contact?"
+        description="This contact will be removed from the group."
+        confirmLabel="Remove"
+        destructive
+        busy={busy}
+        onConfirm={confirmDeleteContact}
+      />
+    </PageShell>
   );
 }

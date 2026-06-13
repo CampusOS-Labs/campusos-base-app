@@ -1,39 +1,63 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarCheck, ChevronDown, CreditCard, History, House, LogOutIcon, Megaphone, ScrollText, Send, Settings, Users } from "lucide-react";
+import {
+  ArticleIcon,
+  CalendarCheckIcon,
+  CaretUpIcon,
+  ClockCounterClockwiseIcon,
+  CreditCardIcon,
+  GearIcon,
+  HouseIcon,
+  PaperPlaneTiltIcon,
+  SignOutIcon,
+  UsersIcon,
+} from "@phosphor-icons/react";
 
 import { signOut, useSession } from "@/lib/auth-client";
+import { ORG_DISPLAY_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarBadge, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 
-const nav = [
-  { title: "Home", href: "/home", icon: <House className="size-4" /> },
-  { title: "Attendance", href: "/attendance", icon: <CalendarCheck className="size-4" /> },
-] as const;
+const navItemClassName = cn(
+  "relative pl-4 transition-transform duration-150 ease-out active:scale-[0.98]",
+  "hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
+  "data-active:!bg-transparent data-active:!font-medium data-active:!text-foreground data-active:hover:!bg-transparent",
+  "data-active:before:absolute data-active:before:top-1/2 data-active:before:left-0 data-active:before:h-5 data-active:before:w-0.5 data-active:before:-translate-y-1/2 data-active:before:rounded-full data-active:before:bg-sidebar-primary",
+);
+
+function isPathActive(pathname: string, href: string) {
+  if (href === "/home") {
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 function getInitials(name?: string | null, email?: string | null): string {
   if (name?.trim()) {
@@ -59,23 +83,35 @@ function getDisplayName(name?: string | null, email?: string | null): string {
   return "User";
 }
 
+type NavItemProps = {
+  href: string;
+  title: string;
+  icon: React.ReactNode;
+  isActive: boolean;
+};
+
+function NavItem({ href, title, icon, isActive }: NavItemProps) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        isActive={isActive}
+        tooltip={title}
+        render={<Link href={href} />}
+        className={navItemClassName}
+      >
+        {icon}
+        <span>{title}</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
 export function AppSidebar({ className, ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const user = session?.user;
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [announcementsOpen, setAnnouncementsOpen] = useState(true);
-
-  useEffect(() => {
-    if (
-      pathname === "/announcements" ||
-      pathname.startsWith("/announcements/") ||
-      pathname === "/groups"
-    ) {
-      setAnnouncementsOpen(true);
-    }
-  }, [pathname]);
 
   async function handleSignOut() {
     setIsSigningOut(true);
@@ -92,187 +128,156 @@ export function AppSidebar({ className, ...props }: React.ComponentProps<typeof 
   return (
     <Sidebar
       collapsible="icon"
-      className={cn(
-        "sticky top-0 flex h-svh shrink-0 flex-col self-start overflow-hidden border-r border-sidebar-border",
-        className,
-      )}
+      className={cn(className)}
       {...props}
     >
-      <SidebarHeader className="shrink-0 px-5 py-3">
-        <div className="flex items-center gap-2">
-          {isPending ? (
-            <>
-              <Skeleton className="size-6 shrink-0 rounded-full" />
-              <div className="flex flex-col gap-1">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-3 w-32" />
-              </div>
-            </>
-          ) : (
-            <>
-              <Avatar size="sm">
-                <AvatarFallback>{getInitials(user?.name, user?.email)}</AvatarFallback>
-                <AvatarBadge className="ring-sidebar" />
-              </Avatar>
-              <div className="flex flex-col">
-                <span className="font-medium leading-tight">
-                  {getDisplayName(user?.name, user?.email)}
-                </span>
-                <span className="text-xs text-muted-foreground">{user?.email ?? "—"}</span>
-              </div>
-            </>
-          )}
+      <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
+        <div className="flex min-w-0 flex-col gap-0.5 group-data-[collapsible=icon]:items-center">
+          <span className="truncate font-medium leading-tight group-data-[collapsible=icon]:sr-only">
+            {ORG_DISPLAY_NAME}
+          </span>
+          <span className="truncate text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+            CampusOS
+          </span>
+          <span
+            aria-hidden
+            className="hidden size-8 items-center justify-center rounded-md bg-sidebar-accent text-sm font-medium group-data-[collapsible=icon]:flex"
+          >
+            {ORG_DISPLAY_NAME.charAt(0)}
+          </span>
         </div>
       </SidebarHeader>
-      <SidebarContent className="min-h-0 flex-1 overflow-hidden px-3 pt-4">
-        <SidebarMenu>
-          {nav.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
-                isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
-                render={<Link href={item.href} />}
-                className={cn(
-                  "pl-4 relative hover:bg-zinc-200",
-                  pathname === item.href && [
-                    "data-active:!bg-transparent data-active:!text-foreground data-active:font-semibold data-active:hover:!bg-transparent",
-                    "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:bg-foreground before:rounded-full",
-                  ],
-                )}
-              >
-                {item.icon && <span className="mr-1.5">{item.icon}</span>}
-                {item.title}
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
-        <SidebarMenu>
-          <Collapsible
-            open={announcementsOpen}
-            onOpenChange={setAnnouncementsOpen}
-          >
-            <SidebarMenuItem>
-              <CollapsibleTrigger
-                render={
-                  <SidebarMenuButton
-                    isActive={
-                      pathname === "/announcements" ||
-                      pathname.startsWith("/announcements/") ||
-                      pathname === "/groups"
-                    }
-                    className={cn(
-                      "pl-4 relative hover:bg-zinc-200",
-                      (pathname === "/announcements" ||
-                        pathname.startsWith("/announcements/") ||
-                        pathname === "/groups") && [
-                        "data-active:!bg-transparent data-active:!text-foreground data-active:font-semibold data-active:hover:!bg-transparent",
-                        "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:bg-foreground before:rounded-full",
-                      ],
-                    )}
-                  />
-                }
-              >
-                <span className="mr-1.5"><Megaphone className="size-4" /></span>
-                <span>Announcements</span>
-                <ChevronDown className="ml-auto size-4 transition-transform data-[open]:rotate-180" />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarMenuSub>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton
-                      render={<Link href="/announcements" />}
-                      isActive={pathname === "/announcements"}
-                    >
-                      <Send className="size-4" />
-                      Compose
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton
-                      render={<Link href="/groups" />}
-                      isActive={pathname === "/groups"}
-                    >
-                      <Users className="size-4" />
-                      Groups
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton
-                      render={<Link href="/announcements/history" />}
-                      isActive={pathname === "/announcements/history"}
-                    >
-                      <History className="size-4" />
-                      History
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                </SidebarMenuSub>
-              </CollapsibleContent>
-            </SidebarMenuItem>
-          </Collapsible>
-        </SidebarMenu>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={pathname === "/payments"}
-              render={<Link href="/payments" />}
-              className={cn(
-                "pl-4 relative hover:bg-zinc-200",
-                pathname === "/payments" && [
-                  "data-active:!bg-transparent data-active:!text-foreground data-active:font-semibold data-active:hover:!bg-transparent",
-                  "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:bg-foreground before:rounded-full",
-                ],
-              )}
-            >
-              <span className="mr-1.5"><CreditCard className="size-4" /></span>
-              Payments
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={pathname === "/logs"}
-              render={<Link href="/logs" />}
-              className={cn(
-                "pl-4 relative hover:bg-zinc-200",
-                pathname === "/logs" && [
-                  "data-active:!bg-transparent data-active:!text-foreground data-active:font-semibold data-active:hover:!bg-transparent",
-                  "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:bg-foreground before:rounded-full",
-                ],
-              )}
-            >
-              <span className="mr-1.5"><ScrollText className="size-4" /></span>
-              Logs
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-        <SidebarMenu className="mt-auto">
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={pathname === "/settings"}
-              render={<Link href="/settings" />}
-              className={cn(
-                "pl-4 relative hover:bg-zinc-200",
-                pathname === "/settings" && [
-                  "data-active:!bg-transparent data-active:!text-foreground data-active:font-semibold data-active:hover:!bg-transparent",
-                  "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:bg-foreground before:rounded-full",
-                ],
-              )}
-            >
-              <span className="mr-1.5"><Settings className="size-4" /></span>
-              Settings
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Today</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <NavItem
+                href="/home"
+                title="Home"
+                icon={<HouseIcon />}
+                isActive={isPathActive(pathname, "/home")}
+              />
+              <NavItem
+                href="/attendance"
+                title="Attendance"
+                icon={<CalendarCheckIcon />}
+                isActive={isPathActive(pathname, "/attendance")}
+              />
+              <NavItem
+                href="/payments"
+                title="Payments"
+                icon={<CreditCardIcon />}
+                isActive={isPathActive(pathname, "/payments")}
+              />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Announcements</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <NavItem
+                href="/announcements"
+                title="Compose"
+                icon={<PaperPlaneTiltIcon />}
+                isActive={pathname === "/announcements"}
+              />
+              <NavItem
+                href="/groups"
+                title="Groups"
+                icon={<UsersIcon />}
+                isActive={isPathActive(pathname, "/groups")}
+              />
+              <NavItem
+                href="/announcements/history"
+                title="History"
+                icon={<ClockCounterClockwiseIcon />}
+                isActive={isPathActive(pathname, "/announcements/history")}
+              />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup className="mt-auto">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <NavItem
+                href="/logs"
+                title="Logs"
+                icon={<ArticleIcon />}
+                isActive={isPathActive(pathname, "/logs")}
+              />
+              <NavItem
+                href="/settings"
+                title="Settings"
+                icon={<GearIcon />}
+                isActive={isPathActive(pathname, "/settings")}
+              />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="shrink-0 px-3 pt-2 pb-4">
-        <Button
-          variant="outline"
-          className="w-full"
-          disabled={isSigningOut}
-          onClick={handleSignOut}
-        >
-          {isSigningOut ? <Spinner /> : <LogOutIcon data-icon="inline-start" />}
-          Log out
-        </Button>
+
+      <SidebarFooter className="border-t border-sidebar-border p-2">
+        {isPending ? (
+          <div className="flex items-center gap-2 px-2 py-1.5">
+            <Skeleton className="size-8 shrink-0 rounded-full" />
+            <div className="flex flex-1 flex-col gap-1 group-data-[collapsible=icon]:hidden">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+          </div>
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <SidebarMenuButton
+                  size="lg"
+                  className="data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground"
+                />
+              }
+            >
+              <Avatar className="size-8">
+                <AvatarFallback className="text-xs">
+                  {getInitials(user?.name, user?.email)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="grid min-w-0 flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
+                <span className="truncate font-medium">
+                  {getDisplayName(user?.name, user?.email)}
+                </span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {user?.email ?? "—"}
+                </span>
+              </div>
+              <CaretUpIcon className="ml-auto group-data-[collapsible=icon]:hidden" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="start" className="w-56">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col gap-1">
+                    <span className="font-medium">{getDisplayName(user?.name, user?.email)}</span>
+                    <span className="text-xs text-muted-foreground">{user?.email ?? "—"}</span>
+                  </div>
+                </DropdownMenuLabel>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={isSigningOut}
+                onClick={() => void handleSignOut()}
+              >
+                {isSigningOut ? <Spinner /> : <SignOutIcon />}
+                Log out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </SidebarFooter>
+
       <SidebarRail />
     </Sidebar>
   );
