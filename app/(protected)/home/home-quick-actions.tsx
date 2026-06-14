@@ -10,7 +10,6 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { FEATURE_UNDER_DEVELOPMENT_MESSAGE } from "@/components/under-development-hint"
-import { isUnderDevelopmentRoute } from "@/lib/under-development-routes"
 
 const actions = [
   {
@@ -33,9 +32,9 @@ const actions = [
     href: "/payments",
     label: "Payments",
     icon: CreditCardIcon,
-    iconClass: "bg-muted text-muted-foreground",
+    iconClass: "bg-sidebar-primary/15 text-sidebar-primary-foreground",
     featured: false,
-    disabled: isUnderDevelopmentRoute("/payments"),
+    disabled: false,
   },
 ] as const
 

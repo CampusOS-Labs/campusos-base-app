@@ -199,7 +199,12 @@ function AppSidebarInner({ className, ...props }: React.ComponentProps<typeof Si
                 icon={<CalendarCheckIcon />}
                 isActive={isPathActive(pathname, "/attendance")}
               />
-              <DisabledNavItem title="Payments" icon={<CreditCardIcon />} />
+              <NavItem
+                href="/payments"
+                title="Payments"
+                icon={<CreditCardIcon />}
+                isActive={isPathActive(pathname, "/payments")}
+              />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

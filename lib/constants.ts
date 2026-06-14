@@ -1,5 +1,5 @@
-export const ORG_DISPLAY_NAME = "Kidzee, Mundhwa"
-export const ORG_BRANCH_NAME = "Mundhwa"
+export const ORG_DISPLAY_NAME = "Kidzee, Vadgaon Sheri"
+export const ORG_BRANCH_NAME = "Vadgaon Sheri"
 export const ORG_PRODUCT_NAME = "CampusOS"
 export const ORG_LOGO_PATH = "/kidzee.jpeg"
 export const ORG_PRIMARY_HEX = "#5c2483"

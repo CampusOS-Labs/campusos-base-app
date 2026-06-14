@@ -11,5 +11,5 @@ export function proxy(request: NextRequest) {
 
 // Keep matcher paths in sync with UNDER_DEVELOPMENT_ROUTES in lib/under-development-routes.ts.
 export const config = {
-  matcher: ["/payments", "/payments/:path*", "/logs", "/logs/:path*"],
+  matcher: ["/logs", "/logs/:path*"],
 };
