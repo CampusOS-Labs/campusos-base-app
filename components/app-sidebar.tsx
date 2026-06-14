@@ -108,6 +108,28 @@ function NavItem({ href, title, icon, isActive }: NavItemProps) {
   );
 }
 
+function DisabledNavItem({ title, icon }: { title: string; icon: React.ReactNode }) {
+  return (
+    <SidebarMenuItem>
+      <Tooltip>
+        <TooltipTrigger render={<span className="flex w-full cursor-not-allowed" />}>
+          <SidebarMenuButton
+            disabled
+            className={cn(
+              navItemClassName,
+              "text-muted-foreground hover:bg-transparent hover:text-muted-foreground active:scale-100",
+            )}
+          >
+            {icon}
+            <span>{title}</span>
+          </SidebarMenuButton>
+        </TooltipTrigger>
+        <TooltipContent side="right">{FEATURE_UNDER_DEVELOPMENT_MESSAGE}</TooltipContent>
+      </Tooltip>
+    </SidebarMenuItem>
+  );
+}
+
 export function AppSidebar({ className, ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Suspense
@@ -177,27 +199,7 @@ function AppSidebarInner({ className, ...props }: React.ComponentProps<typeof Si
                 icon={<CalendarCheckIcon />}
                 isActive={isPathActive(pathname, "/attendance")}
               />
-              <SidebarMenuItem>
-                <Tooltip>
-                  <TooltipTrigger
-                    render={<span className="flex w-full cursor-not-allowed" />}
-                  >
-                    <SidebarMenuButton
-                      disabled
-                      className={cn(
-                        navItemClassName,
-                        "text-muted-foreground hover:bg-transparent hover:text-muted-foreground active:scale-100",
-                      )}
-                    >
-                      <CreditCardIcon />
-                      <span>Payments</span>
-                    </SidebarMenuButton>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    {FEATURE_UNDER_DEVELOPMENT_MESSAGE}
-                  </TooltipContent>
-                </Tooltip>
-              </SidebarMenuItem>
+              <DisabledNavItem title="Payments" icon={<CreditCardIcon />} />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -231,12 +233,7 @@ function AppSidebarInner({ className, ...props }: React.ComponentProps<typeof Si
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
             <SidebarMenu>
-              <NavItem
-                href="/logs"
-                title="Logs"
-                icon={<ArticleIcon />}
-                isActive={isPathActive(pathname, "/logs")}
-              />
+              <DisabledNavItem title="Logs" icon={<ArticleIcon />} />
               <NavItem
                 href="/settings"
                 title="Settings"
