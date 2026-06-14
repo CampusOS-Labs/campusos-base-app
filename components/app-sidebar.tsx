@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { FEATURE_UNDER_DEVELOPMENT_MESSAGE } from "@/components/under-development-hint";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Sidebar,
@@ -193,7 +194,7 @@ function AppSidebarInner({ className, ...props }: React.ComponentProps<typeof Si
                     </SidebarMenuButton>
                   </TooltipTrigger>
                   <TooltipContent side="right">
-                    This feature is currently under development
+                    {FEATURE_UNDER_DEVELOPMENT_MESSAGE}
                   </TooltipContent>
                 </Tooltip>
               </SidebarMenuItem>

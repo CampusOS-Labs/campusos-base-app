@@ -1,16 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import QRCode from "react-qr-code";
-import { RefreshCw } from "lucide-react";
+import { ArrowsClockwiseIcon, CalendarCheckIcon, UsersIcon } from "@phosphor-icons/react";
+import { toast } from "sonner";
 
-import { trackAuthEvent } from "@/lib/analytics/track-event-client"
-import { formatTimeIST } from "@/lib/format"
+import { trackAuthEvent } from "@/lib/analytics/track-event-client";
+import { formatTimeIST } from "@/lib/format";
 import {
   ATTENDANCE_REFRESHED,
   PAGE_VIEW,
   PRODUCT_PAGES,
-} from "@/lib/services/product-analytics-events"
+} from "@/lib/services/product-analytics-events";
 import {
   DataTable,
   MetricStrip,
@@ -20,7 +20,12 @@ import {
 } from "@/components/page-layout";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBanner } from "@/components/status-banner";
+import { WizardStep, WizardStepBadge } from "@/components/wizard-step";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+
+import { CheckInQrPanel } from "./components/check-in-qr-panel";
+import { CheckInStatusBadge } from "./components/check-in-status-badge";
 
 type AttendanceRecord = {
   id: string;
@@ -47,6 +52,14 @@ function checkInUrl() {
   return `${base.replace(/\/$/, "")}/checkin`;
 }
 
+function formatTodayLabel() {
+  return new Intl.DateTimeFormat("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date());
+}
+
 export function AttendanceClient({ initialSummary }: { initialSummary: Summary }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -69,6 +82,16 @@ export function AttendanceClient({ initialSummary }: { initialSummary: Summary }
     }
   }, []);
 
+  const copyLink = useCallback(async () => {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Check-in link copied");
+    } catch {
+      toast.error("Could not copy link");
+    }
+  }, [url]);
+
   useEffect(() => {
     setUrl(checkInUrl());
     trackAuthEvent(PAGE_VIEW, { page: PRODUCT_PAGES.attendance });
@@ -77,15 +100,25 @@ export function AttendanceClient({ initialSummary }: { initialSummary: Summary }
   const records = summary.records;
   const pending = summary.pending;
   const totalTeachers = summary.teachers.length;
+  const allCheckedIn = totalTeachers > 0 && pending.length === 0;
 
   return (
-    <PageShell>
+    <PageShell className="space-y-8">
       <PageHeader
         title="Attendance"
-        description="Teachers scan the QR, get a WhatsApp link, then confirm check-in on their phone."
+        description={`${formatTodayLabel()} · Teachers scan the QR, get a WhatsApp link, then confirm on their phone.`}
         actions={
-          <Button variant="outline" size="sm" onClick={fetchSummary} disabled={loading}>
-            <RefreshCw className={loading ? "animate-spin" : ""} />
+          <Button
+            variant="outline"
+            size="sm"
+            className="ui-press"
+            onClick={fetchSummary}
+            disabled={loading}
+          >
+            <ArrowsClockwiseIcon
+              className={`size-4 ${loading ? "animate-spin" : ""}`}
+              weight="duotone"
+            />
             Refresh
           </Button>
         }
@@ -93,77 +126,89 @@ export function AttendanceClient({ initialSummary }: { initialSummary: Summary }
 
       <MetricStrip
         metrics={[
-          { value: records.length, label: "checked in today" },
-          { value: pending.length, label: "not yet checked in" },
-          { value: totalTeachers, label: "total teachers" },
+          { value: records.length, label: "Checked in today" },
+          { value: pending.length, label: "Not yet checked in" },
+          { value: totalTeachers, label: "Total teachers" },
         ]}
       />
 
-      <PageSection
-        title="Check-in QR code"
-        // description="Print or display at the entrance. Teachers open this on their phone and tap their name."
-      >
-        <div className="flex flex-col items-start gap-6 sm:flex-row">
-          {url ? (
-            <div className="rounded-xl border border-border/80 bg-card p-4 shadow-xs ring-1 ring-foreground/[0.04]">
-              <div className="rounded-lg bg-white p-3">
-                <QRCode value={url} size={160} />
-              </div>
-            </div>
-          ) : null}
-          <div className="flex flex-col gap-2 sm:pt-2">
-            {/*<p className="max-w-md break-all text-sm text-muted-foreground">{url || "—"}</p>*/}
-            {/*<Button variant="outline" size="sm" className="w-fit" onClick={copyLink} disabled={!url}>
-              <Copy />
-              Copy link
-            </Button>*/}
-          </div>
-        </div>
-      </PageSection>
+      {error ? <StatusBanner variant="error">{error}</StatusBanner> : null}
 
-      {error ? (
-        <StatusBanner variant="error">{error}</StatusBanner>
+      {allCheckedIn ? (
+        <StatusBanner variant="success">
+          All teachers have checked in for today.
+        </StatusBanner>
       ) : null}
+
+      <WizardStep
+        step={1}
+        title="Check-in QR code"
+        description="Display this at the entrance so teachers can start the flow."
+      >
+        <CheckInQrPanel url={url} onCopy={copyLink} />
+      </WizardStep>
 
       {pending.length > 0 ? (
-        <PageSection title="Not checked in">
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {pending.map((t) => (
-              <span key={t.id} className="text-sm text-muted-foreground">
-                {t.name}
-              </span>
+        <WizardStep
+          step={2}
+          title="Not checked in yet"
+          description="These teachers haven't completed check-in today."
+          badge={<WizardStepBadge>{pending.length} waiting</WizardStepBadge>}
+        >
+          <div className="flex flex-wrap gap-2">
+            {pending.map((teacher) => (
+              <Badge key={teacher.id} variant="outline" className="font-normal">
+                {teacher.name}
+              </Badge>
             ))}
           </div>
-        </PageSection>
+        </WizardStep>
       ) : null}
 
-      <PageSection title="Today's check-ins">
+      <PageSection
+        title="Today's check-ins"
+        description={
+          records.length > 0
+            ? `${records.length} check-in${records.length === 1 ? "" : "s"} recorded today.`
+            : "Check-ins will appear here as teachers complete the flow."
+        }
+      >
         {records.length === 0 ? (
-          <EmptyState title="No check-ins yet" description="Teachers haven't checked in today." />
+          <EmptyState
+            icon={<CalendarCheckIcon className="size-12" weight="duotone" />}
+            title="No check-ins yet"
+            description="Teachers haven't completed check-in today."
+          />
         ) : (
           <DataTable>
-            <thead className="border-b border-border text-left">
+            <thead className="border-b border-border text-left text-muted-foreground">
               <tr>
-                <th className="px-0 py-3 pr-4 font-medium">Teacher</th>
+                <th className="py-3 pr-4 font-medium">
+                  <span className="inline-flex items-center gap-1.5">
+                    <UsersIcon className="size-3.5" weight="duotone" />
+                    Teacher
+                  </span>
+                </th>
                 <th className="px-4 py-3 font-medium">Time</th>
                 <th className="px-4 py-3 font-medium">Distance</th>
                 <th className="py-3 pl-4 font-medium">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {records.map((r) => (
-                <tr key={r.id} className="hover:bg-muted/30">
-                  <td className="py-3 pr-4 font-medium">{r.teacherName}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{formatTimeIST(r.checkedInAt)}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{r.distanceMeters}m</td>
-                  <td className="py-3 pl-4">
-                    {r.manualOverride ? (
-                      <span className="text-xs font-medium text-warning-foreground">Manual override</span>
-                    ) : r.geofencePassed ? (
-                      <span className="text-xs font-medium text-success-foreground">On-site</span>
-                    ) : (
-                      <span className="text-xs font-medium text-muted-foreground">Unknown</span>
-                    )}
+              {records.map((record) => (
+                <tr
+                  key={record.id}
+                  className="transition-colors duration-150 ease-out hover:bg-muted/30"
+                >
+                  <td className="py-3.5 pr-4 font-medium">{record.teacherName}</td>
+                  <td className="px-4 py-3.5 tabular-nums text-muted-foreground">
+                    {formatTimeIST(record.checkedInAt)}
+                  </td>
+                  <td className="px-4 py-3.5 tabular-nums text-muted-foreground">
+                    {record.distanceMeters}m
+                  </td>
+                  <td className="py-3.5 pl-4">
+                    <CheckInStatusBadge record={record} />
                   </td>
                 </tr>
               ))}

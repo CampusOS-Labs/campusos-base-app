@@ -1,9 +1,9 @@
-import { headers } from "next/headers"
-import Link from "next/link"
 import type { Metadata } from "next"
+import { headers } from "next/headers"
 
 import { Badge } from "@/components/ui/badge"
 import { MetricStrip, PageHeader, PageSection, PageShell, ListRow } from "@/components/page-layout"
+import { UnderDevelopmentHint } from "@/components/under-development-hint"
 import { formatCurrencyRaw } from "@/lib/format"
 import { ORG_DISPLAY_NAME } from "@/lib/constants"
 import { auth } from "@/lib/auth"
@@ -99,12 +99,9 @@ export default async function HomePage() {
               {" "}
               — {formatCurrencyRaw(totalDue)} due from families
             </span>
-            <Link
-              href="/payments"
-              className="ml-2 text-sm font-medium underline-offset-4 hover:underline"
-            >
+            <UnderDevelopmentHint className="ml-2 text-sm font-medium">
               Review payments
-            </Link>
+            </UnderDevelopmentHint>
           </p>
         </PageSection>
       ) : null}
@@ -113,12 +110,7 @@ export default async function HomePage() {
         title="Recent invoices"
         action={
           invoices.length > 5 ? (
-            <Link
-              href="/payments"
-              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-            >
-              View all
-            </Link>
+            <UnderDevelopmentHint className="text-sm">View all</UnderDevelopmentHint>
           ) : null
         }
       >
