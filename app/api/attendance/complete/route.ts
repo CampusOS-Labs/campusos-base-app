@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { SCHOOL_ID } from "@/lib/constants";
 import { completeCheckInSchema } from "@/lib/schemas/attendance";
 import { completeCheckInWithToken } from "@/lib/services/attendance";
+import {
+  CHECKIN_COMPLETED,
+  CHECKIN_FAILED,
+} from "@/lib/services/product-analytics-events";
+import { trackProductEvent } from "@/lib/services/product-analytics";
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,6 +29,13 @@ export async function POST(req: NextRequest) {
     );
 
     if (!result.ok) {
+      trackProductEvent({
+        schoolId: SCHOOL_ID,
+        userId: null,
+        event: CHECKIN_FAILED,
+        properties: { code: result.code },
+      });
+
       if (result.code === "OUTSIDE_GEOFENCE") {
         return NextResponse.json(
           {
@@ -61,6 +74,16 @@ export async function POST(req: NextRequest) {
         { status: 404 },
       );
     }
+
+    trackProductEvent({
+      schoolId: SCHOOL_ID,
+      userId: null,
+      event: CHECKIN_COMPLETED,
+      properties: {
+        teacherId: result.record.teacherId,
+        manualOverride: result.record.manualOverride,
+      },
+    });
 
     return NextResponse.json({ success: true, data: result.record }, { status: 201 });
   } catch (err) {

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { SCHOOL_ID } from "@/lib/constants"
 import { getInvoiceById } from "@/lib/services/invoices"
 import { createOrder } from "@/lib/services/payment"
+import { PAYMENT_STARTED } from "@/lib/services/product-analytics-events"
+import { trackProductEvent } from "@/lib/services/product-analytics"
 import { createOrderSchema } from "@/lib/schemas"
 
 export async function POST(req: NextRequest) {
@@ -23,6 +26,13 @@ export async function POST(req: NextRequest) {
       invoiceId: invoice.invoiceNumber,
       studentName: invoice.student.name,
       parentName: invoice.parent.name,
+    })
+
+    trackProductEvent({
+      schoolId: SCHOOL_ID,
+      userId: null,
+      event: PAYMENT_STARTED,
+      properties: { invoiceId: invoice.invoiceNumber },
     })
 
     return NextResponse.json(

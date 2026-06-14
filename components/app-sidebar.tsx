@@ -17,8 +17,8 @@ import {
 } from "@phosphor-icons/react";
 
 import { signOut, useSession } from "@/lib/auth-client";
-import { ORG_DISPLAY_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { OrgBrand } from "@/components/org-brand";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Sidebar,
   SidebarContent,
@@ -155,20 +156,7 @@ function AppSidebarInner({ className, ...props }: React.ComponentProps<typeof Si
       {...props}
     >
       <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
-        <div className="flex min-w-0 flex-col gap-0.5 group-data-[collapsible=icon]:items-center">
-          <span className="truncate font-medium leading-tight group-data-[collapsible=icon]:sr-only">
-            {ORG_DISPLAY_NAME}
-          </span>
-          <span className="truncate text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-            CampusOS
-          </span>
-          <span
-            aria-hidden
-            className="hidden size-8 items-center justify-center rounded-md bg-sidebar-accent text-sm font-medium group-data-[collapsible=icon]:flex"
-          >
-            {ORG_DISPLAY_NAME.charAt(0)}
-          </span>
-        </div>
+        <OrgBrand variant="sidebar" />
       </SidebarHeader>
 
       <SidebarContent>
@@ -188,12 +176,27 @@ function AppSidebarInner({ className, ...props }: React.ComponentProps<typeof Si
                 icon={<CalendarCheckIcon />}
                 isActive={isPathActive(pathname, "/attendance")}
               />
-              <NavItem
-                href="/payments"
-                title="Payments"
-                icon={<CreditCardIcon />}
-                isActive={isPathActive(pathname, "/payments")}
-              />
+              <SidebarMenuItem>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={<span className="flex w-full cursor-not-allowed" />}
+                  >
+                    <SidebarMenuButton
+                      disabled
+                      className={cn(
+                        navItemClassName,
+                        "text-muted-foreground hover:bg-transparent hover:text-muted-foreground active:scale-100",
+                      )}
+                    >
+                      <CreditCardIcon />
+                      <span>Payments</span>
+                    </SidebarMenuButton>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    This feature is currently under development
+                  </TooltipContent>
+                </Tooltip>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

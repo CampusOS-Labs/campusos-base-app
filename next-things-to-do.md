@@ -2,6 +2,6 @@
   - [x] integrate adding bank details via ui 
   - [ ] integrate adding bank details via api 
 - [x] use new-landing-campusos shadcn preset 
-- [ ] integrate qr code attendance system
+- [x] integrate qr code attendance system
 - [x] make it easier to naviagte and add colors like slot-text
-- [ ] add kidzee logo to dashbaord
+- [x] add kidzee logo to dashbaord

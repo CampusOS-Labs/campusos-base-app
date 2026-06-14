@@ -1,12 +1,13 @@
 "use client"
 
-import { Suspense, useState, useEffect, useRef } from "react"
+import { Suspense, useState, useEffect, useRef, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import { PageHeader, PageShell } from "@/components/page-layout"
 import { WhatsAppPanel } from "./components/whatsapp-panel"
 import { ComposeForm, type SelectedFile } from "./components/compose-form"
 import { RecipientSelector } from "./components/recipient-selector"
-import { SendStatus } from "./components/send-status"
+import { SendFooter } from "./components/send-footer"
+import { WizardStep, WizardStepBadge } from "@/components/wizard-step"
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,15 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { logAnnouncement } from "@/lib/actions/announcements"
+import { trackAuthEvent } from "@/lib/analytics/track-event-client"
+import {
+  ANNOUNCEMENT_FLOW_STEP,
+  ANNOUNCEMENT_SEND_FAILED,
+  ANNOUNCEMENT_SENT,
+  PAGE_VIEW,
+  PRODUCT_PAGES,
+  WHATSAPP_STATE,
+} from "@/lib/services/product-analytics-events"
 import type { Invoice as ServiceInvoice } from "@/lib/services/invoices"
 
 type Invoice = ServiceInvoice
@@ -43,11 +53,19 @@ type ConnectionState = "open" | "connecting" | "close" | "unknown"
 
 const INSTANCE_NAME = "primary"
 
+function trackEvent(
+  event: string,
+  properties?: Record<string, unknown>,
+  durationMs?: number
+) {
+  trackAuthEvent(event, properties, durationMs)
+}
+
 const TYPE_LABELS: Record<string, string> = {
-  announcement: "📢 Announcement",
-  activities: "🎯 Activities",
-  "payment-reminder": "💰 Payment Reminder",
-  media: "📸 Media",
+  announcement: "Announcement",
+  activities: "Activities",
+  "payment-reminder": "Payment Reminder",
+  media: "Media",
 }
 
 function normalizePhone(value: string): string {
@@ -133,9 +151,16 @@ export function AnnouncementsClient({
 
 function AnnouncementsLoading() {
   return (
-    <PageShell className="space-y-8">
+    <PageShell className="space-y-6 pb-24">
       <PageHeader title="New announcement" description="Send a WhatsApp message to parents." />
-      <p className="text-sm text-muted-foreground">Loading...</p>
+      <div className="space-y-4">
+        {[1, 2, 3].map((step) => (
+          <div
+            key={step}
+            className="h-32 animate-pulse rounded-xl border border-border/80 bg-muted/30"
+          />
+        ))}
+      </div>
     </PageShell>
   )
 }
@@ -167,6 +192,8 @@ function AnnouncementsClientInner({
   const parentsMapRef = useRef<Map<string, Recipient>>(new Map())
   const sendAnywayRef = useRef(false)
   const pendingSendRef = useRef<{ recipients: Recipient[]; title: string } | null>(null)
+  const flowStartTimeRef = useRef(Date.now())
+  const whatsappOpenTrackedRef = useRef(false)
   const [showSendConfirm, setShowSendConfirm] = useState(false)
   const [showMissingAlert, setShowMissingAlert] = useState(false)
   const [missingNumbers, setMissingNumbers] = useState<string[]>([])
@@ -182,6 +209,10 @@ function AnnouncementsClientInner({
       setConnectionState("open")
       setQrCode(null)
       setStatus("WhatsApp connected.")
+      if (!whatsappOpenTrackedRef.current) {
+        whatsappOpenTrackedRef.current = true
+        trackEvent(WHATSAPP_STATE, { state: "open" })
+      }
     } else if (normalized === "connecting") {
       setConnectionState("connecting")
       setStatus("Connecting to WhatsApp...")
@@ -200,8 +231,7 @@ function AnnouncementsClientInner({
       const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/state`)
       const state = data?.instance?.state || "close"
       if (state === "open") {
-        setConnectionState("open")
-        setStatus("WhatsApp connected.")
+        applyConnectionState("open")
       } else if (state === "connecting" || state === "syncing") {
         setConnectionState("connecting")
         setStatus("Connecting to WhatsApp...")
@@ -324,6 +354,10 @@ function AnnouncementsClientInner({
     setSelectedAudience(id)
     const recipients = recipientsByAudience.get(id) || []
     setGroupRecipients(recipients)
+    trackEvent(ANNOUNCEMENT_FLOW_STEP, {
+      step: "recipient_selected",
+      audience: id,
+    })
   }
 
   function handleManualContactChange(index: number, value: string) {
@@ -485,6 +519,7 @@ function AnnouncementsClientInner({
     }
     sendAnywayRef.current = false
     pendingSendRef.current = { recipients: allRecipients, title: titleTrimmed }
+    trackEvent(ANNOUNCEMENT_FLOW_STEP, { step: "send_confirmed" })
     setShowSendConfirm(true)
     return
   }
@@ -494,6 +529,8 @@ function AnnouncementsClientInner({
       setShowSendConfirm(false)
       return
     }
+
+    trackEvent(ANNOUNCEMENT_FLOW_STEP, { step: "send_started" })
 
     const { recipients: allRecipients, title: titleTrimmed } = pendingSendRef.current
     setShowSendConfirm(false)
@@ -517,6 +554,7 @@ function AnnouncementsClientInner({
       } catch {}
       const recipientsToSend = allRecipients.filter((r) => validPhoneSet.has(normalizePhone(r.phone)))
       if (recipientsToSend.length === 0) {
+        trackEvent(ANNOUNCEMENT_SEND_FAILED, { reason: "no_valid_numbers" })
         setStatus("No valid WhatsApp numbers found.", true)
         setSending(false)
         return
@@ -568,6 +606,7 @@ function AnnouncementsClientInner({
       }
       const sentCount = results.filter((r) => r.ok).length
       const failedCount = results.length - sentCount
+      const durationMs = Date.now() - flowStartTimeRef.current
 
       logAnnouncement({
         title: titleTrimmed,
@@ -577,6 +616,24 @@ function AnnouncementsClientInner({
         groupId: selectedAudience.startsWith("group-") ? selectedAudience.slice(6) : null,
         audienceLabel: audienceGroups.find((g) => g.id === selectedAudience)?.label || null,
       }).catch(() => {})
+
+      if (sentCount > 0) {
+        trackEvent(
+          ANNOUNCEMENT_SENT,
+          {
+            recipientCount: sentCount,
+            failedCount,
+            type: annType,
+            audience: selectedAudience,
+          },
+          durationMs
+        )
+      } else {
+        trackEvent(ANNOUNCEMENT_SEND_FAILED, {
+          reason: "all_recipients_failed",
+          recipientCount: allRecipients.length,
+        })
+      }
 
       setTitle("")
       setMessage("")
@@ -590,6 +647,7 @@ function AnnouncementsClientInner({
         setStatus(`Sent to ${sentCount} contact(s).`)
       }
     } catch {
+      trackEvent(ANNOUNCEMENT_SEND_FAILED, { reason: "unexpected_error" })
       setStatus("Something went wrong while sending.", true)
     } finally {
       setSending(false)
@@ -597,6 +655,8 @@ function AnnouncementsClientInner({
   }
 
   useEffect(() => {
+    flowStartTimeRef.current = Date.now()
+    trackEvent(PAGE_VIEW, { page: PRODUCT_PAGES.announcementsCompose })
     checkInitialState()
     loadAudienceGroups()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -620,55 +680,110 @@ function AnnouncementsClientInner({
     }
   }, [recipientsByAudience, annType, audienceParam]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const isWhatsAppReady = connectionState === "open"
+  const isMedia = annType === "media"
+
+  const totalRecipientCount = useMemo(() => {
+    const merged = new Map<string, Recipient>()
+    if (selectedAudience !== "manual") {
+      for (const recipient of groupRecipients) merged.set(recipient.phone, recipient)
+    }
+    for (const contact of manualContacts) {
+      const phone = normalizePhone(contact)
+      if (phone && !merged.has(phone)) {
+        merged.set(phone, { phone, parentName: "Parent", invoices: [] })
+      }
+    }
+    return merged.size
+  }, [selectedAudience, groupRecipients, manualContacts])
+
+  const canSend =
+    isWhatsAppReady &&
+    totalRecipientCount > 0 &&
+    title.trim().length > 0 &&
+    (message.trim().length > 0 || isMedia) &&
+    (!isMedia || selectedFile !== null)
+
   return (
-    <PageShell className="space-y-8">
+    <PageShell className="space-y-6 pb-24">
       <PageHeader
         title="New announcement"
-        description="Send a WhatsApp message to parents."
+        description="Connect WhatsApp, write your message, choose parents, and send."
       />
 
-      <WhatsAppPanel
-        connectionState={connectionState}
-        qrCode={qrCode}
-        isRunning={isRunning}
-        onLogout={onLogout}
-        onConnect={onConnect}
-      />
+      <div className="space-y-4">
+        <WizardStep
+          step={1}
+          title="WhatsApp"
+          description="Link the school WhatsApp account used for parent messages."
+          badge={
+            isWhatsAppReady ? (
+              <WizardStepBadge variant="secondary">Ready</WizardStepBadge>
+            ) : (
+              <WizardStepBadge variant="outline">Required</WizardStepBadge>
+            )
+          }
+        >
+          <WhatsAppPanel
+            connectionState={connectionState}
+            qrCode={qrCode}
+            isRunning={isRunning}
+            onLogout={onLogout}
+            onConnect={onConnect}
+          />
+        </WizardStep>
 
-      <div className="flex flex-col gap-5 border-t border-border pt-8">
-        <ComposeForm
-          title={title}
-          message={message}
-          annType={annType}
-          selectedFile={selectedFile}
-          onTitleChange={setTitle}
-          onMessageChange={setMessage}
-          onAnnTypeChange={setAnnType}
-          onFileSelect={setSelectedFile}
-        />
+        <WizardStep
+          step={2}
+          title="Compose"
+          description="What parents will receive on WhatsApp."
+          disabled={!isWhatsAppReady}
+        >
+          <ComposeForm
+            title={title}
+            message={message}
+            annType={annType}
+            selectedFile={selectedFile}
+            onTitleChange={setTitle}
+            onMessageChange={setMessage}
+            onAnnTypeChange={setAnnType}
+            onFileSelect={setSelectedFile}
+          />
+        </WizardStep>
 
-        <hr className="border-t border-border" />
-
-        <RecipientSelector
-          audienceGroups={audienceGroups}
-          selectedAudience={selectedAudience}
-          groupRecipients={groupRecipients}
-          manualContacts={manualContacts}
-          onAudienceChange={handleAudienceChange}
-          onManualContactChange={handleManualContactChange}
-          onAddContact={handleAddContact}
-          onRemoveContact={handleRemoveContact}
-        />
-
-        <hr className="border-t border-border" />
-
-        <SendStatus
-          statusSummary={statusSummary}
-          statusIsError={statusIsError}
-          sending={sending}
-          onSend={onSend}
-        />
+        <WizardStep
+          step={3}
+          title="Recipients"
+          description="Choose a group or add individual numbers."
+          disabled={!isWhatsAppReady}
+          badge={
+            totalRecipientCount > 0 ? (
+              <WizardStepBadge>{totalRecipientCount} selected</WizardStepBadge>
+            ) : null
+          }
+        >
+          <RecipientSelector
+            audienceGroups={audienceGroups}
+            selectedAudience={selectedAudience}
+            groupRecipients={groupRecipients}
+            manualContacts={manualContacts}
+            totalRecipientCount={totalRecipientCount}
+            onAudienceChange={handleAudienceChange}
+            onManualContactChange={handleManualContactChange}
+            onAddContact={handleAddContact}
+            onRemoveContact={handleRemoveContact}
+          />
+        </WizardStep>
       </div>
+
+      <SendFooter
+        statusSummary={statusSummary}
+        statusIsError={statusIsError}
+        sending={sending}
+        totalRecipientCount={totalRecipientCount}
+        canSend={canSend}
+        onSend={onSend}
+      />
 
       <Dialog open={showMissingAlert} onOpenChange={setShowMissingAlert}>
         <DialogContent>

@@ -1,7 +1,17 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useEffect } from "react"
 import { Bell, Copy } from "lucide-react"
+import { toast } from "sonner"
+
+import { trackAuthEvent } from "@/lib/analytics/track-event-client"
+import { formatCurrencyRaw, formatDate } from "@/lib/format"
+import {
+  PAGE_VIEW,
+  PAYMENT_LINK_COPIED,
+  PAYMENT_REMINDER_STARTED,
+  PRODUCT_PAGES,
+} from "@/lib/services/product-analytics-events"
 
 import {
   DataTable,
@@ -10,6 +20,7 @@ import {
   PageSection,
   PageShell,
 } from "@/components/page-layout"
+import { EmptyState } from "@/components/empty-state"
 import { Button } from "@/components/ui/button"
 
 type Invoice = {
@@ -22,32 +33,28 @@ type Invoice = {
   parent: { name: string; phone: string; email: string }
 }
 
-function formatDate(value: string) {
-  if (!value) return "-"
-  return new Date(value).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  })
-}
-
 function paymentLinkForInvoice(invoiceId: string) {
   return `${window.location.origin}/pay/${invoiceId}`
 }
 
-function formatCurrencyRaw(amount: number) {
-  return `₹${amount.toLocaleString("en-IN")}`
-}
-
 export function PaymentsClient({ invoices }: { invoices: Invoice[] }) {
+  useEffect(() => {
+    trackAuthEvent(PAGE_VIEW, { page: PRODUCT_PAGES.payments })
+  }, [])
+
   const copyLink = useCallback(async (invoiceId: string) => {
     const link = paymentLinkForInvoice(invoiceId)
     try {
       await navigator.clipboard.writeText(link)
-    } catch {}
+      trackAuthEvent(PAYMENT_LINK_COPIED, { invoiceId })
+      toast.success("Payment link copied")
+    } catch {
+      toast.error("Could not copy link")
+    }
   }, [])
 
   const remindToPay = useCallback((invoiceId: string) => {
+    trackAuthEvent(PAYMENT_REMINDER_STARTED, { invoiceId })
     const url = new URL("/announcements", window.location.origin)
     url.searchParams.set("invoice", invoiceId)
     url.searchParams.set("audience", "unpaid-parents")
@@ -73,7 +80,10 @@ export function PaymentsClient({ invoices }: { invoices: Invoice[] }) {
 
       <PageSection title="Unpaid invoices">
         {unpaid.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No unpaid invoices right now.</p>
+          <EmptyState
+            title="No unpaid invoices"
+            description="All invoices are paid up right now."
+          />
         ) : (
           <DataTable>
             <thead className="border-b border-border text-left">

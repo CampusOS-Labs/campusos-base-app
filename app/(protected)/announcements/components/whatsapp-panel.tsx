@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { QrCode, LogOut } from "lucide-react";
-import { chromatic, type SlotOptions } from "slot-text";
-import { SlotText } from "slot-text/react";
+import { QrCodeIcon, SignOutIcon } from "@phosphor-icons/react";
+
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type ConnectionState = "open" | "connecting" | "close" | "unknown";
 
@@ -26,72 +26,72 @@ export function WhatsAppPanel({
 }: Props) {
   const isConnected = connectionState === "open";
   const isConnecting = connectionState === "connecting";
-  const buttonText = isConnecting ? "Connecting..." : "Get QR Code";
-  const statusText = isConnecting ? "Connecting..." : "WhatsApp Disconnected";
 
-  const buttonSlotOptions = useMemo<SlotOptions>(
-    () => ({
-      direction: isConnecting ? "up" : "down",
-      skipUnchanged: false,
-      color: isConnecting ? chromatic({ from: 24, spread: 140, saturation: 90, lightness: 58 }) : undefined,
-    }),
-    [isConnecting],
-  );
+  const statusLabel = useMemo(() => {
+    if (isConnected) return "Connected";
+    if (isConnecting) return "Connecting";
+    if (connectionState === "unknown") return "Checking…";
+    return "Not connected";
+  }, [connectionState, isConnected, isConnecting]);
 
-  const statusSlotOptions = useMemo<SlotOptions>(
-    () => ({
-      direction: isConnecting ? "up" : "down",
-      skipUnchanged: false,
-      color: isConnecting ? chromatic({ from: 40, spread: 120, saturation: 88, lightness: 60 }) : undefined,
-    }),
-    [isConnecting],
+  const statusDotClass = cn(
+    "size-2 shrink-0 rounded-full",
+    isConnected && "bg-status-connected",
+    isConnecting && "bg-status-pending animate-pulse",
+    !isConnected && !isConnecting && "bg-muted-foreground/35",
   );
 
   if (isConnected) {
     return (
-      <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-2.5">
-      <div className="flex items-center justify-end gap-2">
-          <span className="size-2 rounded-full bg-green-500" />
-          <span className="text-sm font-medium">WhatsApp Connected</span>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2.5">
+          <span className={statusDotClass} aria-hidden />
+          <div>
+            <p className="text-sm font-medium">WhatsApp is ready</p>
+            <p className="text-xs text-muted-foreground">You can compose and send messages.</p>
+          </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={onLogout} disabled={isRunning}>
-          <LogOut />
-          <SlotText text="Disconnect" options={{ skipUnchanged: true }} />
+        <Button variant="outline" size="sm" onClick={onLogout} disabled={isRunning}>
+          <SignOutIcon />
+          Disconnect
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border bg-muted/30 px-4 py-3 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <Button onClick={onConnect} disabled={isRunning || isConnecting} size="sm">
-          <QrCode />
-          <SlotText text={buttonText} options={buttonSlotOptions} />
-        </Button>
-        <div className="flex items-center gap-2">
-          <span
-            className={`size-2 rounded-full ${connectionState === "connecting" ? "bg-yellow-500" : "bg-gray-300"}`}
-          />
-          <span className="text-sm font-medium">
-            <SlotText text={statusText} options={statusSlotOptions} />
-          </span>
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2.5">
+          <span className={statusDotClass} aria-hidden />
+          <div>
+            <p className="text-sm font-medium">{statusLabel}</p>
+            <p className="text-xs text-muted-foreground">
+              Link WhatsApp before sending to parents.
+            </p>
+          </div>
         </div>
+        <Button onClick={onConnect} disabled={isRunning || isConnecting} size="sm">
+          <QrCodeIcon />
+          {isConnecting ? "Connecting…" : "Connect WhatsApp"}
+        </Button>
       </div>
 
-      {qrCode && (
-        <div className="flex flex-col items-center gap-1">
+      {qrCode ? (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-5">
           <Image
             src={qrCode}
-            className="w-36 h-36 border rounded-md"
-            alt="QR Code"
+            className="size-36 rounded-lg border bg-white p-2 shadow-xs"
+            alt="WhatsApp QR code"
             width={144}
             height={144}
             unoptimized
           />
-          <p className="text-xs text-muted-foreground">Scan with WhatsApp → Linked Devices</p>
+          <p className="max-w-xs text-center text-xs text-muted-foreground">
+            Open WhatsApp on your phone → Linked devices → Link a device → scan this code
+          </p>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

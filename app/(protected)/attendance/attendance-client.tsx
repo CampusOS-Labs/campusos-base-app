@@ -4,6 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import QRCode from "react-qr-code";
 import { RefreshCw } from "lucide-react";
 
+import { trackAuthEvent } from "@/lib/analytics/track-event-client"
+import { formatTimeIST } from "@/lib/format"
+import {
+  ATTENDANCE_REFRESHED,
+  PAGE_VIEW,
+  PRODUCT_PAGES,
+} from "@/lib/services/product-analytics-events"
 import {
   DataTable,
   MetricStrip,
@@ -11,6 +18,8 @@ import {
   PageSection,
   PageShell,
 } from "@/components/page-layout";
+import { EmptyState } from "@/components/empty-state";
+import { StatusBanner } from "@/components/status-banner";
 import { Button } from "@/components/ui/button";
 
 type AttendanceRecord = {
@@ -38,14 +47,6 @@ function checkInUrl() {
   return `${base.replace(/\/$/, "")}/checkin`;
 }
 
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 export function AttendanceClient({ initialSummary }: { initialSummary: Summary }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -60,6 +61,7 @@ export function AttendanceClient({ initialSummary }: { initialSummary: Summary }
       const json = await res.json();
       if (!json.success) throw new Error(json.error || "Could not load attendance");
       setSummary(json.data);
+      trackAuthEvent(ATTENDANCE_REFRESHED);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load attendance");
     } finally {
@@ -69,6 +71,7 @@ export function AttendanceClient({ initialSummary }: { initialSummary: Summary }
 
   useEffect(() => {
     setUrl(checkInUrl());
+    trackAuthEvent(PAGE_VIEW, { page: PRODUCT_PAGES.attendance });
   }, []);
 
   const records = summary.records;
@@ -102,8 +105,10 @@ export function AttendanceClient({ initialSummary }: { initialSummary: Summary }
       >
         <div className="flex flex-col items-start gap-6 sm:flex-row">
           {url ? (
-            <div className="bg-white p-3">
-              <QRCode value={url} size={160} />
+            <div className="rounded-xl border border-border/80 bg-card p-4 shadow-xs ring-1 ring-foreground/[0.04]">
+              <div className="rounded-lg bg-white p-3">
+                <QRCode value={url} size={160} />
+              </div>
             </div>
           ) : null}
           <div className="flex flex-col gap-2 sm:pt-2">
@@ -117,7 +122,7 @@ export function AttendanceClient({ initialSummary }: { initialSummary: Summary }
       </PageSection>
 
       {error ? (
-        <p className="text-sm text-destructive">{error}</p>
+        <StatusBanner variant="error">{error}</StatusBanner>
       ) : null}
 
       {pending.length > 0 ? (
@@ -134,7 +139,7 @@ export function AttendanceClient({ initialSummary }: { initialSummary: Summary }
 
       <PageSection title="Today's check-ins">
         {records.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No check-ins yet today.</p>
+          <EmptyState title="No check-ins yet" description="Teachers haven't checked in today." />
         ) : (
           <DataTable>
             <thead className="border-b border-border text-left">
@@ -149,13 +154,13 @@ export function AttendanceClient({ initialSummary }: { initialSummary: Summary }
               {records.map((r) => (
                 <tr key={r.id} className="hover:bg-muted/30">
                   <td className="py-3 pr-4 font-medium">{r.teacherName}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{formatTime(r.checkedInAt)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatTimeIST(r.checkedInAt)}</td>
                   <td className="px-4 py-3 text-muted-foreground">{r.distanceMeters}m</td>
                   <td className="py-3 pl-4">
                     {r.manualOverride ? (
-                      <span className="text-xs font-medium text-amber-800">Manual override</span>
+                      <span className="text-xs font-medium text-warning-foreground">Manual override</span>
                     ) : r.geofencePassed ? (
-                      <span className="text-xs font-medium text-emerald-800">On-site</span>
+                      <span className="text-xs font-medium text-success-foreground">On-site</span>
                     ) : (
                       <span className="text-xs font-medium text-muted-foreground">Unknown</span>
                     )}

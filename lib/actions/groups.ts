@@ -5,10 +5,16 @@ import { headers } from "next/headers";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { SCHOOL_ID } from "@/lib/constants";
 import {
   kidzeeMundhwaContactGroup,
   kidzeeMundhwaContact,
 } from "@/lib/db/schema";
+import {
+  GROUP_CONTACT_ADDED,
+  GROUP_CREATED,
+} from "@/lib/services/product-analytics-events";
+import { trackProductEvent } from "@/lib/services/product-analytics";
 import {
   getUserGroups as _getUserGroups,
   getGroupWithContacts as _getGroupWithContacts,
@@ -25,21 +31,72 @@ export async function createGroup(formData: FormData) {
 
   const name = formData.get("name")?.toString().trim();
   const description = formData.get("description")?.toString().trim() || null;
+  const contactsRaw = formData.get("contacts")?.toString();
 
   if (!name) throw new Error("Group name is required");
 
+  type ContactInput = { name: string; phoneNumber: string; notes: string | null };
+  let contacts: ContactInput[] = [];
+
+  if (contactsRaw) {
+    try {
+      const parsed = JSON.parse(contactsRaw);
+      if (Array.isArray(parsed)) {
+        contacts = parsed
+          .map((contact) => ({
+            name: String(contact?.name ?? "").trim(),
+            phoneNumber: String(contact?.phoneNumber ?? "").trim(),
+            notes: String(contact?.notes ?? "").trim() || null,
+          }))
+          .filter((contact) => contact.name && contact.phoneNumber);
+      }
+    } catch {
+      throw new Error("Invalid contacts payload");
+    }
+  }
+
   const id = crypto.randomUUID();
 
-  await db.insert(kidzeeMundhwaContactGroup).values({
-    id,
-    name,
-    description,
-    createdBy: user.id,
+  await db.transaction(async (tx) => {
+    await tx.insert(kidzeeMundhwaContactGroup).values({
+      id,
+      name,
+      description,
+      createdBy: user.id,
+    });
+
+    if (contacts.length > 0) {
+      await tx.insert(kidzeeMundhwaContact).values(
+        contacts.map((contact) => ({
+          id: crypto.randomUUID(),
+          groupId: id,
+          name: contact.name,
+          phoneNumber: contact.phoneNumber,
+          notes: contact.notes,
+        })),
+      );
+    }
   });
+
+  trackProductEvent({
+    schoolId: SCHOOL_ID,
+    userId: user.id,
+    event: GROUP_CREATED,
+    properties: { groupId: id, contactCount: contacts.length },
+  });
+
+  for (const _contact of contacts) {
+    trackProductEvent({
+      schoolId: SCHOOL_ID,
+      userId: user.id,
+      event: GROUP_CONTACT_ADDED,
+      properties: { groupId: id, source: "create_group" },
+    });
+  }
 
   revalidatePath("/groups");
   revalidatePath("/announcements");
-  return { id };
+  return { id, contactCount: contacts.length };
 }
 
 export async function updateGroup(formData: FormData) {
@@ -111,6 +168,13 @@ export async function addContact(formData: FormData) {
     name,
     phoneNumber,
     notes,
+  });
+
+  trackProductEvent({
+    schoolId: SCHOOL_ID,
+    userId: user.id,
+    event: GROUP_CONTACT_ADDED,
+    properties: { groupId },
   });
 
   revalidatePath("/groups");

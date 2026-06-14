@@ -2,15 +2,24 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle2 } from "lucide-react";
+
+import { trackPublicEvent } from "@/lib/analytics/track-event-client";
+import {
+  CHECKIN_FAILED,
+  PAGE_VIEW,
+  PRODUCT_PAGES,
+} from "@/lib/services/product-analytics-events";
 
 import {
   formatCheckInTime,
   geolocationErrorMessage,
   getPosition,
 } from "@/lib/checkin/geolocation-client";
+import { ORG_BRANCH_NAME } from "@/lib/constants";
+import { PublicFlowShell } from "@/components/public-flow-shell";
+import { StatusBanner } from "@/components/status-banner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -51,14 +60,17 @@ function ConfirmCheckInInner() {
 
       if (!json.success) {
         setState("error");
+        trackPublicEvent(CHECKIN_FAILED, { reason: "invalid_token" });
         setError(json.error || "Invalid check-in link.");
         return;
       }
 
       setTeacherName(json.data.teacherName);
       setState("ready");
+      trackPublicEvent(PAGE_VIEW, { page: PRODUCT_PAGES.checkinConfirm });
     } catch (err) {
       setState("error");
+      trackPublicEvent(CHECKIN_FAILED, { reason: "token_load_failed" });
       setError(err instanceof Error ? err.message : "Could not load check-in link.");
     }
   }, [token]);
@@ -88,15 +100,16 @@ function ConfirmCheckInInner() {
           return;
         }
 
-        if (!json.success) {
-          throw new Error(json.error || "Check-in failed");
-        }
+      if (!json.success) {
+        throw new Error(json.error || "Check-in failed");
+      }
 
-        setCheckedInAt(json.data.checkedInAt);
-        setState("success");
-      } catch (err) {
-        setState("error");
-        setError(err instanceof Error ? err.message : "Check-in failed");
+      setCheckedInAt(json.data.checkedInAt);
+      setState("success");
+    } catch (err) {
+      setState("error");
+      trackPublicEvent(CHECKIN_FAILED, { reason: "checkin_submit_failed" });
+      setError(err instanceof Error ? err.message : "Check-in failed");
       }
     },
     [token],
@@ -111,6 +124,7 @@ function ConfirmCheckInInner() {
       await submitCheckIn(position.coords.latitude, position.coords.longitude, false);
     } catch (err) {
       setState("ready");
+      trackPublicEvent(CHECKIN_FAILED, { reason: "geolocation_failed" });
       setError(geolocationErrorMessage(err as GeolocationPositionError | Error));
     }
   }, [submitCheckIn]);
@@ -133,80 +147,61 @@ function ConfirmCheckInInner() {
 
   if (state === "success") {
     return (
-      <div className="flex min-h-svh flex-col items-center justify-center gap-4 px-4">
-        <div className="flex size-14 items-center justify-center rounded-full bg-emerald-100">
-          <CheckCircle2 className="size-7 text-emerald-600" />
-        </div>
-        <h1 className="text-xl font-semibold">Checked in!</h1>
-        <p className="max-w-sm text-center text-muted-foreground">
-          {teacherName} · Kidzee Mundhwa
-          {checkedInAt ? ` · ${formatCheckInTime(checkedInAt)}` : ""}
-        </p>
-      </div>
+      <PublicFlowShell
+        title="Checked in!"
+        description={`${teacherName} · ${ORG_BRANCH_NAME}${checkedInAt ? ` · ${formatCheckInTime(checkedInAt)}` : ""}`}
+      />
     );
   }
 
   if (state === "error") {
     return (
-      <div className="flex min-h-svh flex-col items-center justify-center gap-4 px-4">
-        <h1 className="text-xl font-semibold">Check-in unavailable</h1>
-        <p className="max-w-sm text-center text-muted-foreground">{error}</p>
-        {token && (
+      <PublicFlowShell title="Check-in unavailable" description={error}>
+        {token ? (
           <Button variant="outline" onClick={loadToken}>
             Try again
           </Button>
-        )}
-      </div>
+        ) : null}
+      </PublicFlowShell>
     );
   }
 
   return (
     <>
-      <div className="flex min-h-svh flex-col items-center gap-6 px-4 py-8">
-        <div className="flex flex-col items-center gap-2 text-center">
-          <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <CheckCircle2 className="size-5" />
-          </div>
-          <h1 className="text-lg font-semibold">Complete check-in</h1>
-          <p className="text-sm text-muted-foreground">Kidzee Mundhwa</p>
+      <PublicFlowShell title="Complete check-in" description="Confirm it's you, then tap check in">
+        <div className="flex w-full flex-col gap-3">
+          {error && state === "ready" && (
+            <StatusBanner variant="warning">{error}</StatusBanner>
+          )}
+
+          <Card className="w-full">
+            <CardContent className="space-y-4 pt-6">
+              <p className="text-center text-lg font-medium">{teacherName}</p>
+              <Button
+                className="h-12 w-full text-base font-semibold"
+                onClick={handleCheckIn}
+                disabled={state === "locating" || state === "submitting"}
+              >
+                {state === "locating" || state === "submitting" ? (
+                  <>
+                    <Spinner className="mr-2" />
+                    {state === "locating" ? "Getting location..." : "Checking in..."}
+                  </>
+                ) : (
+                  "Check In"
+                )}
+              </Button>
+            </CardContent>
+          </Card>
         </div>
-
-        {error && state === "ready" && (
-          <div className="w-full max-w-md rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-            {error}
-          </div>
-        )}
-
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <p className="text-sm text-muted-foreground">Confirm it&apos;s you</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-center text-lg font-medium">{teacherName}</p>
-            <Button
-              className="h-12 w-full text-base font-semibold"
-              onClick={handleCheckIn}
-              disabled={state === "locating" || state === "submitting"}
-            >
-              {state === "locating" || state === "submitting" ? (
-                <>
-                  <Spinner className="mr-2" />
-                  {state === "locating" ? "Getting location..." : "Checking in..."}
-                </>
-              ) : (
-                "Check In"
-              )}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      </PublicFlowShell>
 
       <Dialog open={overrideOpen} onOpenChange={setOverrideOpen}>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>Are you at the school?</DialogTitle>
             <DialogDescription>
-              Your location doesn&apos;t appear to be at Kidzee Mundhwa
+              Your location doesn&apos;t appear to be at {ORG_BRANCH_NAME}
               {overrideDistance != null ? ` (about ${overrideDistance}m away)` : ""}. If you are on
               campus and GPS is wrong, you can still check in.
             </DialogDescription>

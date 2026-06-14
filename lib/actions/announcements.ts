@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { SCHOOL_ID } from "@/lib/constants";
 import { kidzeeMundhwaAnnouncementLog } from "@/lib/db/schema";
+import {
+  ANNOUNCEMENT_SENT,
+  trackProductEvent,
+} from "@/lib/services/product-analytics";
 
 function requireUser(session: Awaited<ReturnType<typeof auth.api.getSession>>) {
   if (!session?.user?.id) throw new Error("Unauthorized");
@@ -34,6 +39,20 @@ export async function logAnnouncement(data: {
     groupId: data.groupId ?? null,
     audienceLabel: data.audienceLabel ?? null,
   });
+
+  if (data.recipientCount > 0) {
+    trackProductEvent({
+      schoolId: SCHOOL_ID,
+      userId: user.id,
+      event: ANNOUNCEMENT_SENT,
+      properties: {
+        recipientCount: data.recipientCount,
+        type: data.type,
+        audienceLabel: data.audienceLabel ?? null,
+        source: "server",
+      },
+    })
+  };
 
   revalidatePath("/announcements/history");
   return { id };

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { SCHOOL_ID } from "@/lib/constants";
 import { requestCheckInLinkSchema } from "@/lib/schemas/attendance";
 import { requestCheckInLink } from "@/lib/services/attendance";
+import {
+  CHECKIN_LINK_FAILED,
+  CHECKIN_LINK_REQUESTED,
+} from "@/lib/services/product-analytics-events";
+import { trackProductEvent } from "@/lib/services/product-analytics";
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,6 +24,16 @@ export async function POST(req: NextRequest) {
     const result = await requestCheckInLink(parsed.data.teacherId);
 
     if (!result.ok) {
+      trackProductEvent({
+        schoolId: SCHOOL_ID,
+        userId: null,
+        event: CHECKIN_LINK_FAILED,
+        properties: {
+          teacherId: parsed.data.teacherId,
+          code: result.code,
+        },
+      });
+
       if (result.code === "ALREADY_CHECKED_IN") {
         return NextResponse.json(
           { success: false, code: result.code, error: "Already checked in today." },
@@ -49,6 +65,13 @@ export async function POST(req: NextRequest) {
         { status: 404 },
       );
     }
+
+    trackProductEvent({
+      schoolId: SCHOOL_ID,
+      userId: null,
+      event: CHECKIN_LINK_REQUESTED,
+      properties: { teacherId: parsed.data.teacherId },
+    });
 
     return NextResponse.json({
       success: true,

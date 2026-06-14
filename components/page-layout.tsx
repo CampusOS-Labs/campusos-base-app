@@ -1,17 +1,17 @@
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 export function PageShell({
   children,
   className,
 }: {
-  children: React.ReactNode
-  className?: string
+  children: React.ReactNode;
+  className?: string;
 }) {
   return (
     <div className={cn("mx-auto w-full max-w-4xl space-y-10 pb-12", className)}>
       {children}
     </div>
-  )
+  );
 }
 
 export function PageHeader({
@@ -20,17 +20,17 @@ export function PageHeader({
   actions,
   children,
 }: {
-  title: React.ReactNode
-  description?: React.ReactNode
-  actions?: React.ReactNode
-  children?: React.ReactNode
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  actions?: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
-        <h1 className="text-3xl font-semibold font-heading">{title}</h1>
+        <h1 className="text-3xl font-semibold tracking-tight font-heading">{title}</h1>
         {description ? (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
         ) : null}
         {children}
       </div>
@@ -38,26 +38,29 @@ export function PageHeader({
         <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
       ) : null}
     </div>
-  )
+  );
 }
 
 export function MetricStrip({
   metrics,
 }: {
-  metrics: Array<{ value: React.ReactNode; label: string }>
+  metrics: Array<{ value: React.ReactNode; label: string }>;
 }) {
   return (
-    <div className="flex flex-wrap items-baseline justify-center gap-x-10 gap-y-4 border-b border-border pb-8">
+    <div className="grid gap-3 sm:grid-cols-3">
       {metrics.map((metric, index) => (
-        <div key={index} className="flex items-baseline gap-2.5">
-          <span className="text-2xl font-semibold font-heading tabular-nums">
+        <div
+          key={index}
+          className="rounded-xl border border-border/80 bg-card px-4 py-4 shadow-xs ring-1 ring-foreground/[0.04]"
+        >
+          <p className="text-2xl font-semibold tracking-tight font-heading tabular-nums">
             {metric.value}
-          </span>
-          <span className="text-sm text-muted-foreground">{metric.label}</span>
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">{metric.label}</p>
         </div>
       ))}
     </div>
-  )
+  );
 }
 
 export function PageSection({
@@ -67,18 +70,18 @@ export function PageSection({
   children,
   className,
 }: {
-  title?: React.ReactNode
-  description?: React.ReactNode
-  action?: React.ReactNode
-  children: React.ReactNode
-  className?: string
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
 }) {
   return (
     <section className={cn("space-y-4", className)}>
       {title || description || action ? (
         <div className="flex items-end justify-between gap-4">
           <div>
-            {title ? <h2 className="text-lg font-medium">{title}</h2> : null}
+            {title ? <h2 className="text-lg font-medium tracking-tight">{title}</h2> : null}
             {description ? (
               <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
             ) : null}
@@ -88,13 +91,32 @@ export function PageSection({
       ) : null}
       {children}
     </section>
-  )
+  );
 }
 
 export function DataTable({ children }: { children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto rounded-xl border border-border/80 bg-card shadow-xs ring-1 ring-foreground/[0.04] [&_th]:px-4 [&_td]:px-4 [&_th:first-child]:pl-4 [&_td:first-child]:pl-4">
       <table className="w-full text-sm">{children}</table>
     </div>
-  )
+  );
+}
+
+export function ListRow({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-4 border-t border-border px-1 py-3 transition-colors duration-150 ease-out first:border-t-0 hover:bg-muted/40",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
 }

@@ -1,10 +1,14 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { CheckCircle2, MessageCircle } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { MessageCircle } from "lucide-react";
 
+import { trackPublicEvent } from "@/lib/analytics/track-event-client";
+import { PAGE_VIEW, PRODUCT_PAGES } from "@/lib/services/product-analytics-events";
+import { PublicFlowShell } from "@/components/public-flow-shell";
+import { StatusBanner } from "@/components/status-banner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 
 type Teacher = { id: string; name: string };
@@ -30,6 +34,10 @@ export function CheckInClient({
   const [sentToTeacherId, setSentToTeacherId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    trackPublicEvent(PAGE_VIEW, { page: PRODUCT_PAGES.checkin });
+  }, []);
 
   const fetchStatus = useCallback(async () => {
     setRefreshing(true);
@@ -76,89 +84,78 @@ export function CheckInClient({
 
   if (error) {
     return (
-      <div className="flex min-h-svh flex-col items-center justify-center gap-4 px-4">
-        <h1 className="text-xl font-semibold">Could not load check-in</h1>
-        <p className="max-w-sm text-center text-muted-foreground">{error}</p>
+      <PublicFlowShell
+        title="Could not load check-in"
+        description={error}
+      >
         <Button variant="outline" onClick={fetchStatus}>
           Try again
         </Button>
-      </div>
+      </PublicFlowShell>
     );
   }
 
   return (
-    <div className="flex min-h-svh flex-col items-center gap-6 px-4 py-8">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <CheckCircle2 className="size-5" />
-        </div>
-        <h1 className="text-lg font-semibold">Teacher Check-In</h1>
-        <p className="text-sm text-muted-foreground">
-          Kidzee Mundhwa · Select your name to get a WhatsApp link
-        </p>
-        {refreshing && <Spinner className="size-4" />}
-      </div>
+    <PublicFlowShell
+      title="Teacher check-in"
+      description="Select your name to get a WhatsApp link"
+      footer={refreshing ? "Refreshing…" : undefined}
+    >
+      <div className="flex w-full flex-col gap-3">
+        {pageError && (
+          <StatusBanner variant="warning">{pageError}</StatusBanner>
+        )}
 
-      {pageError && (
-        <div className="w-full max-w-md rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          {pageError}
-        </div>
-      )}
-
-      {sentToTeacherId && (
-        <div className="flex w-full max-w-md items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-          <MessageCircle className="mt-0.5 size-4 shrink-0" />
-          <span>
+        {sentToTeacherId && (
+          <StatusBanner variant="success" icon={<MessageCircle className="size-4" />}>
             We sent a check-in link to your WhatsApp. Open it on your phone to complete check-in.
-          </span>
-        </div>
-      )}
+          </StatusBanner>
+        )}
 
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <p className="text-sm text-muted-foreground">Select your name</p>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {teachers.map((teacher) => {
-            const checkedIn = checkedInToday.has(teacher.id);
-            const isBusy = activeTeacherId === teacher.id && linkState === "sending";
-            const linkSent = sentToTeacherId === teacher.id;
+        <Card className="w-full">
+          <CardContent className="space-y-2 pt-6">
+            {teachers.map((teacher) => {
+              const checkedIn = checkedInToday.has(teacher.id);
+              const isBusy = activeTeacherId === teacher.id && linkState === "sending";
+              const linkSent = sentToTeacherId === teacher.id;
 
-            return (
-              <div
-                key={teacher.id}
-                className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="font-medium">{teacher.name}</p>
-                  {checkedIn && <p className="text-xs text-emerald-600">Checked in today</p>}
-                  {linkSent && !checkedIn && (
-                    <p className="text-xs text-muted-foreground">Link sent — check WhatsApp</p>
-                  )}
-                </div>
-                <Button
-                  size="sm"
-                  disabled={checkedIn || (linkState !== "idle" && !isBusy)}
-                  onClick={() => handleRequestLink(teacher.id)}
+              return (
+                <div
+                  key={teacher.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/80 px-3 py-3 transition-colors duration-150 ease-out hover:bg-muted/30"
                 >
-                  {isBusy ? (
-                    <>
-                      <Spinner className="mr-1.5" />
-                      Sending...
-                    </>
-                  ) : checkedIn ? (
-                    "Done"
-                  ) : linkSent ? (
-                    "Resend link"
-                  ) : (
-                    "Send link"
-                  )}
-                </Button>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
-    </div>
+                  <div className="min-w-0">
+                    <p className="font-medium">{teacher.name}</p>
+                    {checkedIn && <p className="text-xs text-success">Checked in today</p>}
+                    {linkSent && !checkedIn && (
+                      <p className="text-xs text-muted-foreground">Link sent — check WhatsApp</p>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={linkSent && !checkedIn ? "outline" : "default"}
+                    disabled={checkedIn || (linkState !== "idle" && !isBusy)}
+                    onClick={() => handleRequestLink(teacher.id)}
+                  >
+                    {isBusy ? (
+                      <>
+                        <Spinner className="mr-1.5" />
+                        Sending...
+                      </>
+                    ) : checkedIn ? (
+                      "Done"
+                    ) : linkSent ? (
+                      "Resend"
+                    ) : (
+                      "Send link"
+                    )}
+                  </Button>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      </div>
+    </PublicFlowShell>
   );
 }

@@ -1,9 +1,17 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Plus, Users, Pencil, Trash2, Phone, UserPlus } from "lucide-react";
 import { PageHeader, PageShell } from "@/components/page-layout";
+import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import {
+  ContactDraftList,
+  createEmptyContactDraft,
+  getValidContactDrafts,
+  type ContactDraft,
+} from "@/components/contact-draft-list";
+import { WizardStep, WizardStepBadge } from "@/components/wizard-step";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +23,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { trackAuthEvent } from "@/lib/analytics/track-event-client";
+import {
+  GROUPS_FLOW_STEP,
+  PAGE_VIEW,
+  PRODUCT_PAGES,
+} from "@/lib/services/product-analytics-events";
 import {
   getGroupWithContacts,
   createGroup,
@@ -47,6 +61,7 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createDescription, setCreateDescription] = useState("");
+  const [createContacts, setCreateContacts] = useState<ContactDraft[]>([]);
 
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editId, setEditId] = useState("");
@@ -62,10 +77,15 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
   const [deleteGroupId, setDeleteGroupId] = useState<string | null>(null);
   const [deleteContactId, setDeleteContactId] = useState<string | null>(null);
 
+  useEffect(() => {
+    trackAuthEvent(PAGE_VIEW, { page: PRODUCT_PAGES.groups });
+  }, []);
+
   const loadGroupContacts = useCallback(async (groupId: string) => {
     try {
       const data = await getGroupWithContacts(groupId);
       setGroupContacts(data.contacts);
+      trackAuthEvent(GROUPS_FLOW_STEP, { step: "group_opened", groupId });
     } catch {}
   }, []);
 
@@ -79,16 +99,47 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
     }
   }
 
+  function resetCreateForm() {
+    setCreateName("");
+    setCreateDescription("");
+    setCreateContacts([]);
+  }
+
+  function openCreateDialog() {
+    resetCreateForm();
+    setShowCreateDialog(true);
+    trackAuthEvent(GROUPS_FLOW_STEP, { step: "create_opened" });
+  }
+
+  function updateCreateContact(
+    index: number,
+    field: keyof ContactDraft,
+    value: string,
+  ) {
+    setCreateContacts((prev) =>
+      prev.map((contact, i) =>
+        i === index ? { ...contact, [field]: value } : contact,
+      ),
+    );
+  }
+
   async function handleCreateGroup() {
     setBusy(true);
     try {
+      const validContacts = getValidContactDrafts(createContacts);
       const fd = new FormData();
       fd.set("name", createName);
       fd.set("description", createDescription);
+      if (validContacts.length > 0) {
+        fd.set("contacts", JSON.stringify(validContacts));
+      }
       await createGroup(fd);
+      trackAuthEvent(GROUPS_FLOW_STEP, {
+        step: "group_created",
+        contactCount: validContacts.length,
+      });
       setShowCreateDialog(false);
-      setCreateName("");
-      setCreateDescription("");
+      resetCreateForm();
       window.location.reload();
     } catch {}
     setBusy(false);
@@ -176,13 +227,15 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
     setBusy(false);
   }
 
+  const validCreateContacts = getValidContactDrafts(createContacts);
+
   return (
     <PageShell className="space-y-8">
       <PageHeader
         title="Groups"
         description="Manage contact groups for sending announcements."
         actions={
-          <Button onClick={() => setShowCreateDialog(true)}>
+          <Button onClick={openCreateDialog}>
             <Plus /> New group
           </Button>
         }
@@ -277,53 +330,103 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
           </div>
         ))}
         {groups.length === 0 ? (
-          <div className="py-12 text-center text-muted-foreground">
-            <Users className="mx-auto mb-3 size-12 opacity-50" />
-            <p>No groups yet. Create one to get started.</p>
-          </div>
+          <EmptyState
+            icon={<Users className="size-12" />}
+            title="No groups yet"
+            description="Create one to organize contacts for announcements."
+          />
         ) : null}
       </div>
 
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Group</DialogTitle>
+      <Dialog
+        open={showCreateDialog}
+        onOpenChange={(open) => {
+          setShowCreateDialog(open);
+          if (!open) resetCreateForm();
+        }}
+      >
+        <DialogContent className="flex max-h-[min(90vh,720px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+          <DialogHeader className="border-b border-border/60 px-6 py-5">
+            <DialogTitle>Create group</DialogTitle>
             <DialogDescription>
-              Create a new group to organize your contacts.
+              Name the group and optionally add parents now — you can always add more later.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="createName">
-                Group Name
-              </label>
-              <Input
-                id="createName"
-                value={createName}
-                onChange={(e) => setCreateName(e.target.value)}
-                required
+
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+            <WizardStep
+              step={1}
+              title="Group details"
+              description="How this group appears when sending announcements."
+            >
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor="createName">
+                    Group name
+                  </label>
+                  <Input
+                    id="createName"
+                    value={createName}
+                    onChange={(e) => setCreateName(e.target.value)}
+                    placeholder="e.g. Nursery A parents"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor="createDesc">
+                    Description (optional)
+                  </label>
+                  <Input
+                    id="createDesc"
+                    value={createDescription}
+                    onChange={(e) => setCreateDescription(e.target.value)}
+                    placeholder="Short note for your team"
+                  />
+                </div>
+              </div>
+            </WizardStep>
+
+            <WizardStep
+              step={2}
+              title="Contacts"
+              description="Add parents now, or leave empty and add them after creating the group."
+              badge={
+                validCreateContacts.length > 0 ? (
+                  <WizardStepBadge>
+                    {validCreateContacts.length} ready
+                  </WizardStepBadge>
+                ) : undefined
+              }
+            >
+              <ContactDraftList
+                contacts={createContacts}
+                onChange={updateCreateContact}
+                onAdd={() =>
+                  setCreateContacts((prev) => [...prev, createEmptyContactDraft()])
+                }
+                onRemove={(index) =>
+                  setCreateContacts((prev) => prev.filter((_, i) => i !== index))
+                }
               />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="createDesc">
-                Description (optional)
-              </label>
-              <Input
-                id="createDesc"
-                value={createDescription}
-                onChange={(e) => setCreateDescription(e.target.value)}
-              />
-            </div>
+            </WizardStep>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="border-t border-border/60 px-6 py-4">
             <Button
               variant="outline"
               onClick={() => setShowCreateDialog(false)}
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateGroup} disabled={busy || !createName.trim()}>
-              Create
+            <Button
+              onClick={handleCreateGroup}
+              disabled={busy || !createName.trim()}
+            >
+              {validCreateContacts.length > 0
+                ? `Create group · ${validCreateContacts.length} contact${
+                    validCreateContacts.length === 1 ? "" : "s"
+                  }`
+                : "Create group"}
             </Button>
           </DialogFooter>
         </DialogContent>

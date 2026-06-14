@@ -1,8 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Script from "next/script";
 
+import { trackPublicEvent } from "@/lib/analytics/track-event-client";
+import { formatCurrency, formatDateLong } from "@/lib/format";
+import { ORG_PRIMARY_HEX } from "@/lib/constants";
+import {
+  PAGE_VIEW,
+  PAYMENT_FAILED,
+  PRODUCT_PAGES,
+} from "@/lib/services/product-analytics-events";
+import { PublicFlowShell } from "@/components/public-flow-shell";
+import { StatusBanner } from "@/components/status-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
@@ -38,22 +48,6 @@ type VerifyData = {
   paidAt: string;
 };
 
-function formatINR(amount: number): string {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 0,
-  }).format(amount);
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-IN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
-
 type PayInvoiceClientProps = {
   invoiceId: string;
   invoice: PayInvoiceData;
@@ -65,6 +59,13 @@ export function PayInvoiceClient({ invoiceId, invoice: initialInvoice }: PayInvo
   const [paymentMsg, setPaymentMsg] = useState("");
   const [verifyData, setVerifyData] = useState<VerifyData | null>(null);
   const [isRazorpayReady, setIsRazorpayReady] = useState(false);
+
+  useEffect(() => {
+    trackPublicEvent(PAGE_VIEW, {
+      page: PRODUCT_PAGES.payInvoice,
+      invoiceId,
+    });
+  }, [invoiceId]);
 
   const handlePay = async () => {
     setPaymentState("loading");
@@ -96,7 +97,7 @@ export function PayInvoiceClient({ invoiceId, invoice: initialInvoice }: PayInvo
           email: order.prefillEmail,
           contact: order.prefillContact,
         },
-        theme: { color: "#2563eb" },
+        theme: { color: ORG_PRIMARY_HEX },
         handler: async (response: Record<string, string>) => {
           setPaymentState("processing");
           try {
@@ -129,6 +130,10 @@ export function PayInvoiceClient({ invoiceId, invoice: initialInvoice }: PayInvo
         },
         modal: {
           ondismiss: () => {
+            trackPublicEvent(PAYMENT_FAILED, {
+              invoiceId,
+              reason: "modal_dismissed",
+            });
             setPaymentMsg("Payment was cancelled or failed. You can try again.");
             setPaymentState("failed");
           },
@@ -137,12 +142,20 @@ export function PayInvoiceClient({ invoiceId, invoice: initialInvoice }: PayInvo
 
       const rzp = new window.Razorpay(options);
       rzp.on("payment.failed", () => {
+        trackPublicEvent(PAYMENT_FAILED, {
+          invoiceId,
+          reason: "razorpay_failed",
+        });
         setPaymentMsg("Payment failed. You can try again.");
         setPaymentState("failed");
       });
       rzp.open();
       setPaymentState("idle");
     } catch (err) {
+      trackPublicEvent(PAYMENT_FAILED, {
+        invoiceId,
+        reason: "order_create_failed",
+      });
       setPaymentMsg(err instanceof Error ? err.message : "Something went wrong");
       setPaymentState("failed");
     }
@@ -150,61 +163,29 @@ export function PayInvoiceClient({ invoiceId, invoice: initialInvoice }: PayInvo
 
   if (invoice.status === "paid" && !verifyData) {
     return (
-      <div className="flex min-h-svh flex-col items-center justify-center gap-4 px-4">
-        <div className="flex size-14 items-center justify-center rounded-full bg-emerald-100">
-          <svg
-            className="size-7 text-emerald-600"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-            />
-          </svg>
-        </div>
-        <h1 className="text-xl font-semibold">Already paid</h1>
-        <p className="max-w-sm text-center text-muted-foreground">
-          This invoice has already been paid. Thank you!
-        </p>
-        <Card className="w-full max-w-sm">
-          <CardContent className="space-y-2 pt-4">
+      <PublicFlowShell title="Already paid" description="This invoice has already been paid. Thank you!">
+        <Card className="w-full">
+          <CardContent className="space-y-2 pt-6">
             <Row label="Invoice" value={invoice.invoiceNumber} />
             <Row label="Student" value={invoice.student.name} />
-            <Row label="Amount" value={formatINR(invoice.totalAmount)} />
+            <Row label="Amount" value={formatCurrency(invoice.totalAmount)} />
           </CardContent>
         </Card>
-      </div>
+      </PublicFlowShell>
     );
   }
 
   if (verifyData) {
     return (
-      <div className="flex min-h-svh flex-col items-center justify-center gap-4 px-4">
-        <div className="flex size-14 items-center justify-center rounded-full bg-emerald-100">
-          <svg
-            className="size-7 text-emerald-600"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-            />
-          </svg>
-        </div>
-        <h1 className="text-xl font-semibold">Payment successful!</h1>
-        <Card className="w-full max-w-sm">
-          <CardContent className="space-y-2 pt-4">
+      <PublicFlowShell
+        title="Payment successful"
+        description={`A receipt has been sent to ${invoice.parent.email}`}
+      >
+        <Card className="w-full">
+          <CardContent className="space-y-2 pt-6">
             <Row label="Invoice" value={verifyData.invoiceId} />
             <Row label="Student" value={invoice.student.name} />
-            <Row label="Amount paid" value={formatINR(verifyData.amountPaid)} />
+            <Row label="Amount paid" value={formatCurrency(verifyData.amountPaid)} />
             <Row label="Payment ID" value={verifyData.razorpayPaymentId} />
             <Row
               label="Date"
@@ -218,10 +199,7 @@ export function PayInvoiceClient({ invoiceId, invoice: initialInvoice }: PayInvo
             />
           </CardContent>
         </Card>
-        <p className="text-center text-sm text-muted-foreground">
-          A receipt has been sent to {invoice.parent.email}
-        </p>
-      </div>
+      </PublicFlowShell>
     );
   }
 
@@ -236,88 +214,58 @@ export function PayInvoiceClient({ invoiceId, invoice: initialInvoice }: PayInvo
           setPaymentMsg("Failed to load payment gateway. Please refresh and try again.");
         }}
       />
-      <div className="flex min-h-svh flex-col items-center justify-center gap-6 px-4 py-8">
-        <div className="flex flex-col items-center gap-2">
-          <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <svg
-              className="size-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z"
-              />
-            </svg>
-          </div>
-          <h1 className="text-lg font-semibold">Complete your payment</h1>
-        </div>
+      <PublicFlowShell
+        title="Complete your payment"
+        footer={
+          <>
+            Powered by <span className="font-medium">Razorpay</span>
+          </>
+        }
+      >
+        <div className="flex w-full flex-col gap-3">
+          <Card className="w-full">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">{invoice.student.name}</span>
+                <span className="text-xs text-muted-foreground">{invoice.student.class}</span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="h-px bg-border" />
+              <Row label="Invoice" value={invoice.invoiceNumber} />
+              <Row label="Due date" value={formatDateLong(invoice.dueDate)} />
+              <div className="h-px bg-border" />
+              <div className="flex items-baseline justify-between pt-1">
+                <span className="text-sm text-muted-foreground">Total amount</span>
+                <span className="text-2xl font-bold tracking-tight">
+                  {formatCurrency(invoice.totalAmount)}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{invoice.student.name}</span>
-              <span className="text-xs text-muted-foreground">{invoice.student.class}</span>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="h-px bg-border" />
-            <Row label="Invoice" value={invoice.invoiceNumber} />
-            <Row label="Due date" value={formatDate(invoice.dueDate)} />
-            <div className="h-px bg-border" />
-
-            <div className="flex items-baseline justify-between pt-1">
-              <span className="text-sm text-muted-foreground">Total amount</span>
-              <span className="text-2xl font-bold tracking-tight">
-                {formatINR(invoice.totalAmount)}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {paymentState === "failed" && paymentMsg && (
-          <div className="flex w-full max-w-sm items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-            <svg
-              className="mt-0.5 size-4 shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
-              />
-            </svg>
-            <span>{paymentMsg}</span>
-          </div>
-        )}
-
-        <Button
-          className="h-12 w-full max-w-sm text-base font-semibold"
-          onClick={handlePay}
-          disabled={paymentState === "loading" || paymentState === "processing" || !isRazorpayReady}
-        >
-          {paymentState === "loading" || paymentState === "processing" ? (
-            <>
-              <Spinner className="mr-2" />
-              {paymentState === "loading" ? "Preparing payment..." : "Verifying payment..."}
-            </>
-          ) : !isRazorpayReady ? (
-            "Loading payment gateway..."
-          ) : (
-            `Pay ${formatINR(invoice.totalAmount)} with Razorpay`
+          {paymentState === "failed" && paymentMsg && (
+            <StatusBanner variant="warning">{paymentMsg}</StatusBanner>
           )}
-        </Button>
 
-        <p className="text-center text-xs text-muted-foreground">
-          Powered by <span className="font-medium">Razorpay</span>
-        </p>
-      </div>
+          <Button
+            className="h-12 w-full text-base font-semibold"
+            onClick={handlePay}
+            disabled={paymentState === "loading" || paymentState === "processing" || !isRazorpayReady}
+          >
+            {paymentState === "loading" || paymentState === "processing" ? (
+              <>
+                <Spinner className="mr-2" />
+                {paymentState === "loading" ? "Preparing payment..." : "Verifying payment..."}
+              </>
+            ) : !isRazorpayReady ? (
+              "Loading payment gateway..."
+            ) : (
+              `Pay ${formatCurrency(invoice.totalAmount)} with Razorpay`
+            )}
+          </Button>
+        </div>
+      </PublicFlowShell>
     </>
   );
 }

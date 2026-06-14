@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { SCHOOL_ID } from "@/lib/constants"
 import { markInvoicePaid } from "@/lib/services/invoices"
+import {
+  PAYMENT_COMPLETED,
+  PAYMENT_FAILED,
+} from "@/lib/services/product-analytics-events"
+import { trackProductEvent } from "@/lib/services/product-analytics"
 import {
   verifyPaymentSignature,
   fetchPaymentDetails,
@@ -29,6 +35,13 @@ export async function POST(req: NextRequest) {
     )
 
     if (!isValid) {
+      trackProductEvent({
+        schoolId: SCHOOL_ID,
+        userId: null,
+        event: PAYMENT_FAILED,
+        properties: { invoiceId, reason: "invalid_signature" },
+      })
+
       return NextResponse.json(
         { success: false, error: "Payment verification failed. Invalid signature." },
         { status: 400 },
@@ -42,6 +55,16 @@ export async function POST(req: NextRequest) {
       razorpayPaymentId,
       method: paymentDetails.method,
       paidAt: new Date().toISOString(),
+    })
+
+    trackProductEvent({
+      schoolId: SCHOOL_ID,
+      userId: null,
+      event: PAYMENT_COMPLETED,
+      properties: {
+        invoiceId: invoiceId.toUpperCase(),
+        method: paymentDetails.method,
+      },
     })
 
     return NextResponse.json({
@@ -59,6 +82,12 @@ export async function POST(req: NextRequest) {
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : "Verification failed"
+    trackProductEvent({
+      schoolId: SCHOOL_ID,
+      userId: null,
+      event: PAYMENT_FAILED,
+      properties: { reason: "verification_error" },
+    })
     return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }
