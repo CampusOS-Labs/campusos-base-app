@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button";
 const CHECK_IN_STEPS = [
   "Teacher scans this QR at the entrance.",
   "They select their name on the check-in page.",
-  "WhatsApp sends them a confirmation link.",
-  "They confirm on their phone to complete check-in.",
+  "They tap Check In when arriving and Check Out when leaving.",
 ] as const;
 
 type Props = {

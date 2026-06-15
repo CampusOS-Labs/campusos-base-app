@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { SCHOOL_ID } from "@/lib/constants";
-import { completeCheckInSchema } from "@/lib/schemas/attendance";
-import { completeCheckInWithToken } from "@/lib/services/attendance";
+import { checkOutSchema } from "@/lib/schemas/attendance";
+import { checkOutTeacher } from "@/lib/services/attendance";
 import {
-  CHECKIN_COMPLETED,
-  CHECKIN_FAILED,
+  CHECKOUT_COMPLETED,
+  CHECKOUT_FAILED,
 } from "@/lib/services/product-analytics-events";
 import { trackProductEvent } from "@/lib/services/product-analytics";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const parsed = completeCheckInSchema.safeParse(body);
+    const parsed = checkOutSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
@@ -21,19 +21,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await completeCheckInWithToken(
-      parsed.data.token,
-      parsed.data.latitude,
-      parsed.data.longitude,
-      parsed.data.manualOverride,
-    );
+    const result = await checkOutTeacher(parsed.data);
 
     if (!result.ok) {
       trackProductEvent({
         schoolId: SCHOOL_ID,
         userId: null,
-        event: CHECKIN_FAILED,
-        properties: { code: result.code },
+        event: CHECKOUT_FAILED,
+        properties: { code: result.code, teacherId: parsed.data.teacherId },
       });
 
       if (result.code === "OUTSIDE_GEOFENCE") {
@@ -48,29 +43,22 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      if (result.code === "ALREADY_CHECKED_IN") {
+      if (result.code === "ALREADY_CHECKED_OUT") {
         return NextResponse.json(
-          { success: false, code: result.code, error: "Already checked in today." },
+          { success: false, code: result.code, error: "Already checked out today." },
           { status: 409 },
         );
       }
 
-      if (result.code === "EXPIRED_TOKEN") {
+      if (result.code === "NOT_CHECKED_IN") {
         return NextResponse.json(
-          { success: false, code: result.code, error: "This link has expired. Request a new one." },
-          { status: 410 },
-        );
-      }
-
-      if (result.code === "USED_TOKEN") {
-        return NextResponse.json(
-          { success: false, code: result.code, error: "This link has already been used." },
-          { status: 410 },
+          { success: false, code: result.code, error: "You need to check in first." },
+          { status: 409 },
         );
       }
 
       return NextResponse.json(
-        { success: false, code: result.code, error: "Invalid or expired check-in link." },
+        { success: false, code: result.code, error: "Unknown teacher." },
         { status: 404 },
       );
     }
@@ -78,16 +66,16 @@ export async function POST(req: NextRequest) {
     trackProductEvent({
       schoolId: SCHOOL_ID,
       userId: null,
-      event: CHECKIN_COMPLETED,
+      event: CHECKOUT_COMPLETED,
       properties: {
         teacherId: result.record.teacherId,
-        manualOverride: result.record.manualOverride,
+        manualOverride: result.record.checkoutManualOverride,
       },
     });
 
-    return NextResponse.json({ success: true, data: result.record }, { status: 201 });
+    return NextResponse.json({ success: true, data: result.record }, { status: 200 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Check-in failed";
+    const message = err instanceof Error ? err.message : "Check-out failed";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

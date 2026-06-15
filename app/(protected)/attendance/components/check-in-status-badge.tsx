@@ -6,9 +6,19 @@ import { cn } from "@/lib/utils";
 type AttendanceRecord = {
   manualOverride: boolean;
   geofencePassed: boolean;
+  checkedOutAt: string | null;
+  checkoutManualOverride?: boolean;
 };
 
 export function CheckInStatusBadge({ record }: { record: AttendanceRecord }) {
+  if (record.checkedOutAt) {
+    return (
+      <Badge variant="outline" className="font-normal text-muted-foreground">
+        Checked out
+      </Badge>
+    );
+  }
+
   if (record.manualOverride) {
     return (
       <Badge

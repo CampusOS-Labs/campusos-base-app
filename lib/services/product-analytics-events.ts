@@ -16,10 +16,10 @@ export const GROUP_CONTACT_ADDED = "group_contact_added"
 export const ATTENDANCE_FLOW_STEP = "attendance_flow_step"
 export const ATTENDANCE_REFRESHED = "attendance_refreshed"
 
-export const CHECKIN_LINK_REQUESTED = "checkin_link_requested"
-export const CHECKIN_LINK_FAILED = "checkin_link_failed"
 export const CHECKIN_COMPLETED = "checkin_completed"
 export const CHECKIN_FAILED = "checkin_failed"
+export const CHECKOUT_COMPLETED = "checkout_completed"
+export const CHECKOUT_FAILED = "checkout_failed"
 
 export const PAYMENT_STARTED = "payment_started"
 export const PAYMENT_COMPLETED = "payment_completed"
@@ -32,15 +32,14 @@ export const PRODUCT_PAGES = {
   groups: "groups",
   payInvoice: "pay_invoice",
   checkin: "checkin",
-  checkinConfirm: "checkin_confirm",
 } as const
 
 export const PUBLIC_ANALYTICS_EVENTS = new Set([
   PAGE_VIEW,
-  CHECKIN_LINK_REQUESTED,
-  CHECKIN_LINK_FAILED,
   CHECKIN_COMPLETED,
   CHECKIN_FAILED,
+  CHECKOUT_COMPLETED,
+  CHECKOUT_FAILED,
   PAYMENT_STARTED,
   PAYMENT_COMPLETED,
   PAYMENT_FAILED,

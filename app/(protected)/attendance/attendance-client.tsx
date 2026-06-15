@@ -32,6 +32,7 @@ type AttendanceRecord = {
   teacherId: string;
   teacherName: string;
   checkedInAt: string;
+  checkedOutAt: string | null;
   distanceMeters: number;
   geofencePassed: boolean;
   manualOverride: boolean;
@@ -99,6 +100,7 @@ export function AttendanceClient({ initialSummary }: { initialSummary: Summary }
 
   const records = summary.records;
   const pending = summary.pending;
+  const onSite = records.filter((record) => !record.checkedOutAt);
   const totalTeachers = summary.teachers.length;
   const allCheckedIn = totalTeachers > 0 && pending.length === 0;
 
@@ -106,7 +108,7 @@ export function AttendanceClient({ initialSummary }: { initialSummary: Summary }
     <PageShell className="space-y-8">
       <PageHeader
         title="Attendance"
-        description={`${formatTodayLabel()} · Teachers scan the QR, get a WhatsApp link, then confirm on their phone.`}
+        description={`${formatTodayLabel()} · Teachers scan the QR, select their name, and check in on the website.`}
         actions={
           <Button
             variant="outline"
@@ -127,8 +129,8 @@ export function AttendanceClient({ initialSummary }: { initialSummary: Summary }
       <MetricStrip
         metrics={[
           { value: records.length, label: "Checked in today" },
+          { value: onSite.length, label: "Still on-site" },
           { value: pending.length, label: "Not yet checked in" },
-          { value: totalTeachers, label: "Total teachers" },
         ]}
       />
 
@@ -189,7 +191,8 @@ export function AttendanceClient({ initialSummary }: { initialSummary: Summary }
                     Teacher
                   </span>
                 </th>
-                <th className="px-4 py-3 font-medium">Time</th>
+                <th className="px-4 py-3 font-medium">Check-in</th>
+                <th className="px-4 py-3 font-medium">Check-out</th>
                 <th className="px-4 py-3 font-medium">Distance</th>
                 <th className="py-3 pl-4 font-medium">Status</th>
               </tr>
@@ -203,6 +206,9 @@ export function AttendanceClient({ initialSummary }: { initialSummary: Summary }
                   <td className="py-3.5 pr-4 font-medium">{record.teacherName}</td>
                   <td className="px-4 py-3.5 tabular-nums text-muted-foreground">
                     {formatTimeIST(record.checkedInAt)}
+                  </td>
+                  <td className="px-4 py-3.5 tabular-nums text-muted-foreground">
+                    {record.checkedOutAt ? formatTimeIST(record.checkedOutAt) : "—"}
                   </td>
                   <td className="px-4 py-3.5 tabular-nums text-muted-foreground">
                     {record.distanceMeters}m
