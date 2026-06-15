@@ -1,8 +1,3 @@
-"use client";
-
-import { useState } from "react";
-import Image from "next/image";
-
 import {
   ORG_BRANCH_NAME,
   ORG_DISPLAY_NAME,
@@ -18,37 +13,21 @@ const logoSizeClass = {
   login: "h-10 w-auto max-w-[8rem]",
 } as const;
 
-function OrgMonogram({ className }: { className?: string }) {
-  return (
-    <span
-      className={cn(
-        "flex shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground",
-        className,
-      )}
-    >
-      K
-    </span>
-  );
-}
-
 function OrgLogo({
   variant,
   className,
-  onError,
 }: {
   variant: keyof typeof logoSizeClass;
   className?: string;
-  onError?: () => void;
 }) {
   return (
-    <Image
+    // Static public asset — plain img avoids prod-only next/image optimizer failures.
+    <img
       src={ORG_LOGO_PATH}
       alt={`${ORG_DISPLAY_NAME} logo`}
-      width={2048}
-      height={2048}
       className={cn("shrink-0 object-contain", logoSizeClass[variant], className)}
-      onError={onError}
-      priority
+      fetchPriority="high"
+      decoding="async"
     />
   );
 }
@@ -64,11 +43,7 @@ export function OrgBrand({
   showProductName = true,
   className,
 }: OrgBrandProps) {
-  const [logoFailed, setLogoFailed] = useState(false);
-
-  const logo = logoFailed ? (
-    <OrgMonogram className={cn("size-8", variant === "public" && "size-10")} />
-  ) : (
+  const logo = (
     <OrgLogo
       variant={variant}
       className={
@@ -76,7 +51,6 @@ export function OrgBrand({
           ? "group-data-[collapsible=icon]:h-7 group-data-[collapsible=icon]:max-w-[1.75rem]"
           : undefined
       }
-      onError={() => setLogoFailed(true)}
     />
   );
 
