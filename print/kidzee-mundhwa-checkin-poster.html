@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Teacher Check-In QR — Kidzee, Vadgaon Sheri</title>
+    <style>
+      @page {
+        size: A4 portrait;
+        margin: 12mm;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        color: #111;
+        background: #fff;
+      }
+
+      .page {
+        width: 210mm;
+        min-height: 297mm;
+        margin: 0 auto;
+        padding: 14mm 16mm;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10mm;
+      }
+
+      .brand {
+        text-align: center;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 28pt;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .brand p {
+        margin: 4mm 0 0;
+        font-size: 13pt;
+        color: #444;
+      }
+
+      .qr-wrap {
+        padding: 6mm;
+        border: 2px dashed #bbb;
+        border-radius: 4mm;
+        background: #fafafa;
+      }
+
+      .qr-wrap img {
+        display: block;
+        width: 140mm;
+        height: 140mm;
+        image-rendering: pixelated;
+      }
+
+      .steps {
+        width: 100%;
+        max-width: 170mm;
+      }
+
+      .steps h2 {
+        margin: 0 0 4mm;
+        font-size: 14pt;
+        text-align: center;
+      }
+
+      .steps ol {
+        margin: 0;
+        padding-left: 6mm;
+        font-size: 12pt;
+        line-height: 1.55;
+      }
+
+      .steps li + li {
+        margin-top: 3mm;
+      }
+
+      .url {
+        margin-top: auto;
+        text-align: center;
+        font-size: 10pt;
+        color: #555;
+        word-break: break-all;
+      }
+
+      @media print {
+        body {
+          background: #fff;
+        }
+
+        .page {
+          width: auto;
+          min-height: auto;
+          padding: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="brand">
+        <h1>Teacher Check-In</h1>
+        <p>Kidzee, Vadgaon Sheri</p>
+      </header>
+
+      <div class="qr-wrap">
+        <img
+          src="kidzee-mundhwa-checkin-qr.png"
+          alt="QR code for teacher check-in"
+          width="2400"
+          height="2400"
+        />
+      </div>
+
+      <section class="steps">
+        <h2>How to check in</h2>
+        <ol>
+          <li>Scan this QR code at the entrance.</li>
+          <li>Select your name on the check-in page.</li>
+          <li>WhatsApp will send you a confirmation link.</li>
+          <li>Open the link and confirm on your phone to complete check-in.</li>
+        </ol>
+      </section>
+
+      <p class="url">https://kidzee-mundwa-campusos.vercel.app/checkin</p>
+    </main>
+  </body>
+</html>

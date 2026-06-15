@@ -10,7 +10,6 @@ import {
 import { ORG_BRANCH_NAME } from "@/lib/constants";
 import {
   CHECKIN_FAILED,
-  CHECKOUT_FAILED,
   PAGE_VIEW,
   PRODUCT_PAGES,
 } from "@/lib/services/product-analytics-events";
@@ -32,25 +31,18 @@ type Teacher = { id: string; name: string };
 
 type TeacherActionState = "idle" | "locating" | "submitting";
 
-type AttendanceAction = "checkin" | "checkout";
-
 type CheckInClientProps = {
   initialTeachers: Teacher[];
   initialCheckedInToday: string[];
-  initialCheckedOutToday: string[];
 };
 
 export function CheckInClient({
   initialTeachers,
   initialCheckedInToday,
-  initialCheckedOutToday,
 }: CheckInClientProps) {
   const [teachers, setTeachers] = useState(initialTeachers);
   const [checkedInToday, setCheckedInToday] = useState<Set<string>>(
     () => new Set(initialCheckedInToday),
-  );
-  const [checkedOutToday, setCheckedOutToday] = useState<Set<string>>(
-    () => new Set(initialCheckedOutToday),
   );
   const [activeTeacherId, setActiveTeacherId] = useState<string | null>(null);
   const [actionState, setActionState] = useState<TeacherActionState>("idle");
@@ -58,9 +50,8 @@ export function CheckInClient({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [overrideOpen, setOverrideOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<{
+  const [pendingCheckIn, setPendingCheckIn] = useState<{
     teacherId: string;
-    action: AttendanceAction;
     lat: number;
     lng: number;
   } | null>(null);
@@ -79,7 +70,6 @@ export function CheckInClient({
       if (!json.success) throw new Error(json.error || "Could not load teachers");
       setTeachers(json.data.teachers);
       setCheckedInToday(new Set(json.data.checkedInToday));
-      setCheckedOutToday(new Set(json.data.checkedOutToday));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load check-in page");
     } finally {
@@ -87,23 +77,14 @@ export function CheckInClient({
     }
   }, []);
 
-  const submitAction = useCallback(
-    async (
-      action: AttendanceAction,
-      teacherId: string,
-      latitude: number,
-      longitude: number,
-      manualOverride = false,
-    ) => {
+  const submitCheckIn = useCallback(
+    async (teacherId: string, latitude: number, longitude: number, manualOverride = false) => {
       setActiveTeacherId(teacherId);
       setActionState("submitting");
       setPageError("");
 
-      const endpoint = action === "checkin" ? "/api/attendance/checkin" : "/api/attendance/checkout";
-      const failureEvent = action === "checkin" ? CHECKIN_FAILED : CHECKOUT_FAILED;
-
       try {
-        const res = await fetch(endpoint, {
+        const res = await fetch("/api/attendance/checkin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ teacherId, latitude, longitude, manualOverride }),
@@ -111,7 +92,7 @@ export function CheckInClient({
         const json = await res.json();
 
         if (res.status === 422 && json.code === "OUTSIDE_GEOFENCE") {
-          setPendingAction({ teacherId, action, lat: latitude, lng: longitude });
+          setPendingCheckIn({ teacherId, lat: latitude, lng: longitude });
           setOverrideDistance(json.distanceMeters ?? null);
           setOverrideOpen(true);
           setActionState("idle");
@@ -120,21 +101,12 @@ export function CheckInClient({
         }
 
         if (!json.success) {
-          throw new Error(json.error || (action === "checkin" ? "Check-in failed" : "Check-out failed"));
+          throw new Error(json.error || "Check-in failed");
         }
 
-        if (action === "checkin") {
-          setCheckedInToday((prev) => new Set([...prev, teacherId]));
-        } else {
-          setCheckedInToday((prev) => {
-            const next = new Set(prev);
-            next.delete(teacherId);
-            return next;
-          });
-          setCheckedOutToday((prev) => new Set([...prev, teacherId]));
-        }
+        setCheckedInToday((prev) => new Set([...prev, teacherId]));
       } catch (err) {
-        trackPublicEvent(failureEvent, { reason: "submit_failed" });
+        trackPublicEvent(CHECKIN_FAILED, { reason: "submit_failed" });
         setPageError(err instanceof Error ? err.message : "Something went wrong");
       } finally {
         setActionState("idle");
@@ -144,46 +116,42 @@ export function CheckInClient({
     [],
   );
 
-  const handleAction = useCallback(
-    async (action: AttendanceAction, teacherId: string) => {
+  const handleCheckIn = useCallback(
+    async (teacherId: string) => {
       setActiveTeacherId(teacherId);
       setActionState("locating");
       setPageError("");
 
       try {
         const position = await getPosition();
-        await submitAction(
-          action,
+        await submitCheckIn(
           teacherId,
           position.coords.latitude,
           position.coords.longitude,
           false,
         );
       } catch (err) {
-        trackPublicEvent(action === "checkin" ? CHECKIN_FAILED : CHECKOUT_FAILED, {
-          reason: "geolocation_failed",
-        });
+        trackPublicEvent(CHECKIN_FAILED, { reason: "geolocation_failed" });
         setPageError(geolocationErrorMessage(err as GeolocationPositionError | Error));
         setActionState("idle");
         setActiveTeacherId(null);
       }
     },
-    [submitAction],
+    [submitCheckIn],
   );
 
   const handleOverrideConfirm = useCallback(async () => {
-    if (!pendingAction) return;
+    if (!pendingCheckIn) return;
     setOverrideOpen(false);
-    await submitAction(
-      pendingAction.action,
-      pendingAction.teacherId,
-      pendingAction.lat,
-      pendingAction.lng,
+    await submitCheckIn(
+      pendingCheckIn.teacherId,
+      pendingCheckIn.lat,
+      pendingCheckIn.lng,
       true,
     );
-    setPendingAction(null);
+    setPendingCheckIn(null);
     setOverrideDistance(null);
-  }, [pendingAction, submitAction]);
+  }, [pendingCheckIn, submitCheckIn]);
 
   if (error) {
     return (
@@ -199,7 +167,7 @@ export function CheckInClient({
     <>
       <PublicFlowShell
         title="Teacher check-in"
-        description="Select your name to check in or check out"
+        description="Select your name to check in for today"
         footer={refreshing ? "Refreshing…" : undefined}
       >
         <div className="flex w-full flex-col gap-3">
@@ -208,7 +176,6 @@ export function CheckInClient({
           <Card className="w-full">
             <CardContent className="space-y-2 pt-6">
               {teachers.map((teacher) => {
-                const checkedOut = checkedOutToday.has(teacher.id);
                 const checkedIn = checkedInToday.has(teacher.id);
                 const isBusy = activeTeacherId === teacher.id && actionState !== "idle";
 
@@ -219,34 +186,22 @@ export function CheckInClient({
                   >
                     <div className="min-w-0">
                       <p className="font-medium">{teacher.name}</p>
-                      {checkedOut && (
-                        <p className="text-xs text-muted-foreground">Checked out today</p>
-                      )}
-                      {checkedIn && !checkedOut && (
-                        <p className="text-xs text-success">Checked in</p>
+                      {checkedIn && (
+                        <p className="text-xs text-success">Checked in today</p>
                       )}
                     </div>
                     <Button
                       size="sm"
-                      variant={checkedIn && !checkedOut ? "outline" : "default"}
-                      disabled={checkedOut || (actionState !== "idle" && !isBusy)}
-                      onClick={() =>
-                        handleAction(checkedIn && !checkedOut ? "checkout" : "checkin", teacher.id)
-                      }
+                      disabled={checkedIn || (actionState !== "idle" && !isBusy)}
+                      onClick={() => handleCheckIn(teacher.id)}
                     >
                       {isBusy ? (
                         <>
                           <Spinner className="mr-1.5" />
-                          {actionState === "locating"
-                            ? "Getting location..."
-                            : checkedIn && !checkedOut
-                              ? "Checking out..."
-                              : "Checking in..."}
+                          {actionState === "locating" ? "Getting location..." : "Checking in..."}
                         </>
-                      ) : checkedOut ? (
-                        "Done"
                       ) : checkedIn ? (
-                        "Check Out"
+                        "Done"
                       ) : (
                         "Check In"
                       )}
@@ -274,15 +229,13 @@ export function CheckInClient({
               variant="outline"
               onClick={() => {
                 setOverrideOpen(false);
-                setPendingAction(null);
+                setPendingCheckIn(null);
                 setOverrideDistance(null);
               }}
             >
               Cancel
             </Button>
-            <Button onClick={handleOverrideConfirm}>
-              {pendingAction?.action === "checkout" ? "Yes, check me out" : "Yes, check me in"}
-            </Button>
+            <Button onClick={handleOverrideConfirm}>Yes, check me in</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

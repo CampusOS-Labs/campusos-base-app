@@ -6,7 +6,7 @@ import { CheckInClient } from "./checkin-client";
 
 export const metadata: Metadata = {
   title: "Teacher Check-In",
-  description: "Check in and out at Kidzee Mundhwa by selecting your name and confirming your location.",
+  description: "Check in at Kidzee Mundhwa by selecting your name and confirming your location.",
 };
 
 export default async function CheckInPage() {
@@ -20,7 +20,6 @@ export default async function CheckInPage() {
     <CheckInClient
       initialTeachers={teachers}
       initialCheckedInToday={status.checkedInToday}
-      initialCheckedOutToday={status.checkedOutToday}
     />
   );
 }

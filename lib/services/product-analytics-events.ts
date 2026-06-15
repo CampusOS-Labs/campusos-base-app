@@ -18,8 +18,6 @@ export const ATTENDANCE_REFRESHED = "attendance_refreshed"
 
 export const CHECKIN_COMPLETED = "checkin_completed"
 export const CHECKIN_FAILED = "checkin_failed"
-export const CHECKOUT_COMPLETED = "checkout_completed"
-export const CHECKOUT_FAILED = "checkout_failed"
 
 export const PAYMENT_STARTED = "payment_started"
 export const PAYMENT_COMPLETED = "payment_completed"
@@ -38,8 +36,6 @@ export const PUBLIC_ANALYTICS_EVENTS = new Set([
   PAGE_VIEW,
   CHECKIN_COMPLETED,
   CHECKIN_FAILED,
-  CHECKOUT_COMPLETED,
-  CHECKOUT_FAILED,
   PAYMENT_STARTED,
   PAYMENT_COMPLETED,
   PAYMENT_FAILED,

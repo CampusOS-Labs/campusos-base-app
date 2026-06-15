@@ -81,15 +81,15 @@ export default async function HomePage() {
 
       <HomeQuickActions />
 
-      <MetricStrip
+      {/*<MetricStrip
         metrics={[
           { value: pending.length, label: "pending" },
           { value: formatCurrencyRaw(totalDue), label: "outstanding" },
           { value: formatCurrencyRaw(totalCollected), label: "collected" },
         ]}
-      />
+      />*/}
 
-      {pending.length > 0 ? (
+      {/*{pending.length > 0 ? (
         <PageSection title="Needs attention">
           <p className="text-sm">
             <span className="font-medium">
@@ -104,9 +104,9 @@ export default async function HomePage() {
             </UnderDevelopmentHint>
           </p>
         </PageSection>
-      ) : null}
+      ) : null}*/}
 
-      <PageSection
+      {/*<PageSection
         title="Recent invoices"
         action={
           invoices.length > 5 ? (
@@ -136,7 +136,7 @@ export default async function HomePage() {
             ))}
           </div>
         )}
-      </PageSection>
+      </PageSection>*/}
     </PageShell>
   )
 }

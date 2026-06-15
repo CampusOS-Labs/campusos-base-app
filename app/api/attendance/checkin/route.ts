@@ -11,13 +11,12 @@ import { trackProductEvent } from "@/lib/services/product-analytics";
 
 export async function GET() {
   try {
-    const { checkedInToday, checkedOutToday } = await getTodayCheckInStatus();
+    const { checkedInToday } = await getTodayCheckInStatus();
     return NextResponse.json({
       success: true,
       data: {
         teachers: listTeachers(),
         checkedInToday,
-        checkedOutToday,
       },
     });
   } catch (err) {

@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, gte, lte } from "drizzle-orm";
 
 import { TEACHERS, getTeacherById } from "@/lib/config/teachers";
 import { getSchoolGeofence } from "@/lib/config/school";
@@ -17,12 +17,6 @@ export type AttendanceRecord = {
   distanceMeters: number;
   geofencePassed: boolean;
   manualOverride: boolean;
-  checkedOutAt: string | null;
-  checkoutLatitude: number | null;
-  checkoutLongitude: number | null;
-  checkoutDistanceMeters: number | null;
-  checkoutGeofencePassed: boolean | null;
-  checkoutManualOverride: boolean;
 };
 
 function rowToRecord(row: typeof kidzeeMundhwaTeacherAttendance.$inferSelect): AttendanceRecord {
@@ -36,12 +30,6 @@ function rowToRecord(row: typeof kidzeeMundhwaTeacherAttendance.$inferSelect): A
     distanceMeters: row.distanceMeters,
     geofencePassed: row.geofencePassed,
     manualOverride: row.manualOverride,
-    checkedOutAt: row.checkedOutAt?.toISOString() ?? null,
-    checkoutLatitude: row.checkoutLatitude,
-    checkoutLongitude: row.checkoutLongitude,
-    checkoutDistanceMeters: row.checkoutDistanceMeters,
-    checkoutGeofencePassed: row.checkoutGeofencePassed,
-    checkoutManualOverride: row.checkoutManualOverride,
   };
 }
 
@@ -73,23 +61,9 @@ export async function getTodayAttendance(): Promise<AttendanceRecord[]> {
   return rows.map(rowToRecord);
 }
 
-export async function getTodayCheckInStatus(): Promise<{
-  checkedInToday: string[];
-  checkedOutToday: string[];
-}> {
+export async function getTodayCheckInStatus(): Promise<{ checkedInToday: string[] }> {
   const records = await getTodayAttendance();
-  const checkedInToday: string[] = [];
-  const checkedOutToday: string[] = [];
-
-  for (const record of records) {
-    if (record.checkedOutAt) {
-      checkedOutToday.push(record.teacherId);
-    } else {
-      checkedInToday.push(record.teacherId);
-    }
-  }
-
-  return { checkedInToday, checkedOutToday };
+  return { checkedInToday: records.map((record) => record.teacherId) };
 }
 
 export type CheckInInput = {
@@ -136,88 +110,6 @@ export async function checkInTeacher(input: CheckInInput): Promise<CheckInResult
       geofencePassed,
       manualOverride: Boolean(input.manualOverride),
     })
-    .returning();
-
-  return { ok: true, record: rowToRecord(row) };
-}
-
-export type CheckOutInput = {
-  teacherId: string;
-  latitude: number;
-  longitude: number;
-  manualOverride?: boolean;
-};
-
-export type CheckOutResult =
-  | { ok: true; record: AttendanceRecord }
-  | {
-      ok: false;
-      code:
-        | "UNKNOWN_TEACHER"
-        | "NOT_CHECKED_IN"
-        | "ALREADY_CHECKED_OUT"
-        | "OUTSIDE_GEOFENCE";
-      distanceMeters?: number;
-    };
-
-export async function checkOutTeacher(input: CheckOutInput): Promise<CheckOutResult> {
-  const teacher = getTeacherById(input.teacherId);
-  if (!teacher) {
-    return { ok: false, code: "UNKNOWN_TEACHER" };
-  }
-
-  const [openRecord] = await db
-    .select()
-    .from(kidzeeMundhwaTeacherAttendance)
-    .where(
-      and(
-        eq(kidzeeMundhwaTeacherAttendance.teacherId, input.teacherId),
-        todayAttendanceFilters(),
-        isNull(kidzeeMundhwaTeacherAttendance.checkedOutAt),
-      ),
-    )
-    .limit(1);
-
-  if (!openRecord) {
-    const [completedRecord] = await db
-      .select({ id: kidzeeMundhwaTeacherAttendance.id })
-      .from(kidzeeMundhwaTeacherAttendance)
-      .where(
-        and(
-          eq(kidzeeMundhwaTeacherAttendance.teacherId, input.teacherId),
-          todayAttendanceFilters(),
-        ),
-      )
-      .limit(1);
-
-    if (completedRecord) {
-      return { ok: false, code: "ALREADY_CHECKED_OUT" };
-    }
-
-    return { ok: false, code: "NOT_CHECKED_IN" };
-  }
-
-  const geofence = getSchoolGeofence();
-  const dist = Math.round(
-    distanceMeters(input.latitude, input.longitude, geofence.lat, geofence.lng),
-  );
-  const geofencePassed = dist <= geofence.radiusM;
-
-  if (!geofencePassed && !input.manualOverride) {
-    return { ok: false, code: "OUTSIDE_GEOFENCE", distanceMeters: dist };
-  }
-
-  const [row] = await db
-    .update(kidzeeMundhwaTeacherAttendance)
-    .set({
-      checkedOutAt: new Date(),
-      checkoutLatitude: input.latitude,
-      checkoutLongitude: input.longitude,
-      checkoutDistanceMeters: dist,
-      checkoutGeofencePassed: geofencePassed,
-      checkoutManualOverride: Boolean(input.manualOverride),
-    })
-    .where(eq(kidzeeMundhwaTeacherAttendance.id, openRecord.id))
     .returning();
 
   return { ok: true, record: rowToRecord(row) };
