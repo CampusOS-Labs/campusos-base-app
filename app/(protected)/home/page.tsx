@@ -9,6 +9,7 @@ import { ORG_DISPLAY_NAME } from "@/lib/constants"
 import { auth } from "@/lib/auth"
 import { listInvoices } from "@/lib/services/invoices"
 import { HomeQuickActions } from "./home-quick-actions"
+import { HomeSupportContact } from "./home-support-contact"
 
 export const metadata: Metadata = {
   title: "Home",
@@ -80,6 +81,8 @@ export default async function HomePage() {
       />
 
       <HomeQuickActions />
+
+      <HomeSupportContact />
 
       {/*<MetricStrip
         metrics={[
