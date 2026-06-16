@@ -11,16 +11,15 @@ const OUTPUT = path.resolve(
 );
 
 const GROUPS = [
-  { heading: "nursery", name: "Nursery parents", id: "pg-nursery-parents-001" },
-  { heading: "playgroup", name: "Playgroup parents", id: "pg-playgroup-parents-001" },
-  { heading: "sr kg", name: "Senior KG parents", id: "pg-sr-kg-parents-001" },
-  { heading: "junior kg", name: "Junior KG parents", id: "pg-jr-kg-parents-001" },
+  { heading: "nursery", name: "Nursery", id: "pg-nursery-parents-001" },
+  { heading: "playgroup", name: "Playgroup", id: "pg-playgroup-parents-001" },
+  { heading: "sr kg", name: "Senior KG", id: "pg-sr-kg-parents-001" },
+  { heading: "junior kg", name: "Junior KG", id: "pg-jr-kg-parents-001" },
 ] as const;
 
-type ParentContact = {
+type StudentContact = {
   name: string;
   phone: string;
-  notes: string;
 };
 
 type StudentRow = {
@@ -44,6 +43,12 @@ function normalizePhone(raw: string): string | null {
   return digits;
 }
 
+function looksLikePhone(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  return normalizePhone(trimmed) !== null && !/[a-zA-Z]/.test(trimmed);
+}
+
 function parseLine(line: string): StudentRow | null {
   const match = line.match(/^\s*\d+\.\s*(.+)$/);
   if (!match) return null;
@@ -51,8 +56,33 @@ function parseLine(line: string): StudentRow | null {
   const parts = match[1].split(",").map((part) => part.trim());
   while (parts.length < 5) parts.push("");
 
+  const student = parts[0] ?? "";
+  if (!student) return null;
+
+  // Shorthand: kid, phone
+  if (parts.length === 2 && looksLikePhone(parts[1] ?? "")) {
+    return {
+      student,
+      father: "",
+      fatherPhone: parts[1] ?? "",
+      mother: "",
+      motherPhone: "",
+    };
+  }
+
+  // Malformed row where the second field is actually the phone number.
+  if (looksLikePhone(parts[1] ?? "") && !parts[2]) {
+    return {
+      student,
+      father: "",
+      fatherPhone: parts[1] ?? "",
+      mother: parts[3] ?? "",
+      motherPhone: parts[4] ?? "",
+    };
+  }
+
   return {
-    student: parts[0] ?? "",
+    student,
     father: parts[1] ?? "",
     fatherPhone: parts[2] ?? "",
     mother: parts[3] ?? "",
@@ -60,40 +90,22 @@ function parseLine(line: string): StudentRow | null {
   };
 }
 
-function contactsForStudent(row: StudentRow): ParentContact[] {
-  const notes = `Parent of ${row.student}`;
-  const contacts: ParentContact[] = [];
+function firstPhoneForRow(row: StudentRow): string | null {
+  return (
+    normalizePhone(row.fatherPhone) ??
+    normalizePhone(row.motherPhone) ??
+    (looksLikePhone(row.father) ? normalizePhone(row.father) : null)
+  );
+}
 
-  const fatherPhone = normalizePhone(row.fatherPhone);
-  const motherPhone = normalizePhone(row.motherPhone);
+function studentContactForRow(row: StudentRow): StudentContact | null {
+  const phone = firstPhoneForRow(row);
+  if (!phone) return null;
 
-  if (row.father && fatherPhone) {
-    contacts.push({ name: row.father, phone: fatherPhone, notes });
-  }
-
-  if (row.mother && motherPhone) {
-    contacts.push({ name: row.mother, phone: motherPhone, notes });
-  }
-
-  // Single phone with a named parent but stored in the other slot.
-  if (row.father && !fatherPhone && motherPhone && !row.mother) {
-    contacts.push({ name: row.father, phone: motherPhone, notes });
-  }
-
-  if (row.mother && !motherPhone && fatherPhone && !row.father) {
-    contacts.push({ name: row.mother, phone: fatherPhone, notes });
-  }
-
-  // Only one phone and no parent name — still import for WhatsApp reach.
-  if (contacts.length === 0) {
-    const phone = fatherPhone ?? motherPhone;
-    if (phone) {
-      const name = row.father || row.mother || `Parent of ${row.student}`;
-      contacts.push({ name, phone, notes });
-    }
-  }
-
-  return contacts;
+  return {
+    name: row.student,
+    phone,
+  };
 }
 
 function parseMarkdown(content: string): Map<string, StudentRow[]> {
@@ -102,6 +114,8 @@ function parseMarkdown(content: string): Map<string, StudentRow[]> {
 
   for (const rawLine of content.split("\n")) {
     const line = rawLine.trim();
+    if (!line || line.startsWith("<!--")) continue;
+
     const heading = line.match(/^##\s+(.+)$/);
     if (heading) {
       current = heading[1].trim().toLowerCase();
@@ -126,7 +140,8 @@ function buildSql(): string {
   const sections = parseMarkdown(content);
 
   const lines: string[] = [
-    "-- Seed class parent contact groups from lib/config/parent contacts.md",
+    "-- Seed class contact groups from lib/config/parent contacts.md",
+    "-- One contact per student: name = kid, phone = first available number in row.",
     "-- Safe to re-run: removes previously seeded class groups first.",
     "-- Requires at least one row in public.\"user\" (uses earliest created account as owner).",
     "",
@@ -172,21 +187,30 @@ function buildSql(): string {
 
   for (const group of GROUPS) {
     const rows = sections.get(group.heading) ?? [];
-    const contacts: Array<ParentContact & { id: string; groupId: string }> = [];
+    const contacts: Array<StudentContact & { id: string; groupId: string }> = [];
+    const skipped: string[] = [];
     let index = 1;
 
     for (const row of rows) {
-      for (const contact of contactsForStudent(row)) {
-        contacts.push({
-          ...contact,
-          id: contactId(group.id, index),
-          groupId: group.id,
-        });
-        index += 1;
+      const contact = studentContactForRow(row);
+      if (!contact) {
+        skipped.push(row.student);
+        continue;
       }
+
+      contacts.push({
+        ...contact,
+        id: contactId(group.id, index),
+        groupId: group.id,
+      });
+      index += 1;
     }
 
     totalContacts += contacts.length;
+
+    if (skipped.length > 0) {
+      lines.push(`-- ${group.name}: skipped (no phone): ${skipped.join(", ")}`);
+    }
 
     if (contacts.length === 0) {
       lines.push(`-- ${group.name}: no contacts with phone numbers`);
@@ -194,7 +218,7 @@ function buildSql(): string {
       continue;
     }
 
-    lines.push(`-- ${group.name}: ${contacts.length} contacts`);
+    lines.push(`-- ${group.name}: ${contacts.length} contacts (${rows.length} students)`);
     lines.push(
       "INSERT INTO kidzee_mundhwa_contact (id, group_id, name, phone_number, notes)",
       "VALUES",
@@ -203,7 +227,7 @@ function buildSql(): string {
       contacts
         .map(
           (contact) =>
-            `  ('${contact.id}', '${contact.groupId}', '${escapeSql(contact.name)}', '${contact.phone}', '${escapeSql(contact.notes)}')`,
+            `  ('${contact.id}', '${contact.groupId}', '${escapeSql(contact.name)}', '${contact.phone}', '')`,
         )
         .join(",\n") + ";",
     );

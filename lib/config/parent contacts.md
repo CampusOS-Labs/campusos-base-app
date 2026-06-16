@@ -32,7 +32,7 @@
 ## sr kg
 
 1. abhimanyu kolpe, akash kolpe, , , 7709442562
-2. aditya sinde, sharad sinde, , ,/
+2. aditya sinde, sharad sinde, , , 
 3. daksh kumar, manish kumar, , , 8007569922
 4. jija rasal, shriniwas rasal, , , 9763769753
 5. kyra purkar, ravira purkar, , dipali purkar, 7709110992

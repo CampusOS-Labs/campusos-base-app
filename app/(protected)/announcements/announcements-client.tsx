@@ -403,18 +403,11 @@ function AnnouncementsClientInner({
             status: String(invoice.status || "pending").toLowerCase() === "paid" ? "paid" : "pending",
           })
         }
-        const allParents = Array.from(parentsMap.values()).sort((a, b) => a.parentName.localeCompare(b.parentName))
         parentsMapRef.current = parentsMap
-        const unpaidParents = allParents
+        const unpaidParents = Array.from(parentsMap.values())
           .map((r) => ({ ...r, invoices: r.invoices.filter((i) => i.status === "pending") }))
           .filter((r) => r.invoices.length > 0)
-
-        groups.push(
-          { id: "unpaid-parents", label: `Unpaid Parents (${unpaidParents.length})`, help: "Parents with pending invoices. Includes payment links.", recipients: unpaidParents },
-          { id: "all-parents", label: `All Parents (${allParents.length})`, help: "All parents in the system.", recipients: allParents },
-        )
-        map.set("unpaid-parents", unpaidParents)
-        map.set("all-parents", allParents)
+          .sort((a, b) => a.parentName.localeCompare(b.parentName))
 
         const { getGroupWithContacts } = await import("@/lib/actions/groups")
         const groupContactsData = await Promise.all(
@@ -423,12 +416,22 @@ function AnnouncementsClientInner({
               getGroupWithContacts(g.id).then((data) => ({ group: g, data }))
             )
         )
+
+        const allParentsMap = new Map<string, Recipient>()
         for (const { group: g, data: groupData } of groupContactsData) {
-          const recipients: Recipient[] = groupData.contacts.map((c) => ({
-            phone: c.phoneNumber,
-            parentName: c.name,
-            invoices: [],
-          }))
+          const recipients: Recipient[] = groupData.contacts.map((c) => {
+            const phone = c.phoneNumber
+            const fromInvoice = parentsMap.get(normalizePhone(phone))
+            return {
+              phone,
+              parentName: c.name,
+              invoices: fromInvoice?.invoices ?? [],
+            }
+          })
+          for (const recipient of recipients) {
+            const key = normalizePhone(recipient.phone)
+            if (!allParentsMap.has(key)) allParentsMap.set(key, recipient)
+          }
           const groupId = `group-${g.id}`
           groups.push({
             id: groupId,
@@ -438,6 +441,19 @@ function AnnouncementsClientInner({
           })
           map.set(groupId, recipients)
         }
+
+        const allParents = (
+          allParentsMap.size > 0
+            ? Array.from(allParentsMap.values())
+            : Array.from(parentsMap.values())
+        ).sort((a, b) => a.parentName.localeCompare(b.parentName))
+
+        groups.unshift(
+          { id: "unpaid-parents", label: `Unpaid Parents (${unpaidParents.length})`, help: "Parents with pending invoices. Includes payment links.", recipients: unpaidParents },
+          { id: "all-parents", label: `All Parents (${allParents.length})`, help: "All contacts from your saved groups (deduplicated by phone).", recipients: allParents },
+        )
+        map.set("unpaid-parents", unpaidParents)
+        map.set("all-parents", allParents)
       } catch {}
 
       groups.push({ id: "manual", label: "Manual Only", help: "Only send to manually entered phone numbers.", recipients: [] })
