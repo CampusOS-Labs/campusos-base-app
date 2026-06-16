@@ -47,8 +47,4 @@ opencode.jsonc
 *.tsbuildinfo
 next-env.d.ts
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 275e13c (update ignore)
 .playwright-mcp/

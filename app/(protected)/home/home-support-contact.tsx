@@ -36,7 +36,7 @@ export function HomeSupportContact() {
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-medium leading-snug">WhatsApp support</span>
             <span className="block text-xs text-muted-foreground">
-              {"Join Amaan <> Kidzee Mundhwa"}
+              {"Join Amaan <> Kidzee Vadgaon Sheri"}
             </span>
           </span>
         </a>
