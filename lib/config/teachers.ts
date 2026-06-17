@@ -6,6 +6,7 @@ export const TEACHERS = [
   { id: "t5", name: "Mitali Pungaliya" },
   { id: "t6", name: "Tushar Kamble" },
   { id: "t7", name: "Suraj Rai" },
+  { id: "t8", name: "Bhuvaneshwari Fulpagarq" },
 ] as const;
 
 export type Teacher = (typeof TEACHERS)[number];
