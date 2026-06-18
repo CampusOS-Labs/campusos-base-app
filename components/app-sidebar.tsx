@@ -199,12 +199,11 @@ function AppSidebarInner({ className, ...props }: React.ComponentProps<typeof Si
                 icon={<CalendarCheckIcon />}
                 isActive={isPathActive(pathname, "/attendance")}
               />
-              <DisabledNavItem title="Payments" icon={<CreditCardIcon />} />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
+        {/*<SidebarGroup>
           <SidebarGroupLabel>Announcements</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -228,7 +227,7 @@ function AppSidebarInner({ className, ...props }: React.ComponentProps<typeof Si
               />
             </SidebarMenu>
           </SidebarGroupContent>
-        </SidebarGroup>
+        </SidebarGroup>*/}
 
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
