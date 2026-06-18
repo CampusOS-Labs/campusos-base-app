@@ -1,9 +1,9 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 import { headers } from "next/headers"
 
 import { Badge } from "@/components/ui/badge"
 import { MetricStrip, PageHeader, PageSection, PageShell, ListRow } from "@/components/page-layout"
-import { UnderDevelopmentHint } from "@/components/under-development-hint"
 import { formatCurrencyRaw } from "@/lib/format"
 import { ORG_DISPLAY_NAME } from "@/lib/constants"
 import { auth } from "@/lib/auth"
@@ -90,9 +90,9 @@ export default async function HomePage() {
           { value: formatCurrencyRaw(totalDue), label: "outstanding" },
           { value: formatCurrencyRaw(totalCollected), label: "collected" },
         ]}
-      />*/}
+      />
 
-      {/*{pending.length > 0 ? (
+      {pending.length > 0 ? (
         <PageSection title="Needs attention">
           <p className="text-sm">
             <span className="font-medium">
@@ -102,18 +102,23 @@ export default async function HomePage() {
               {" "}
               — {formatCurrencyRaw(totalDue)} due from families
             </span>
-            <UnderDevelopmentHint className="ml-2 text-sm font-medium">
+            <Link
+              href="/payments"
+              className="ml-2 text-sm font-medium text-primary hover:underline"
+            >
               Review payments
-            </UnderDevelopmentHint>
+            </Link>
           </p>
         </PageSection>
-      ) : null}*/}
+      ) : null}
 
-      {/*<PageSection
+      <PageSection
         title="Recent invoices"
         action={
           invoices.length > 5 ? (
-            <UnderDevelopmentHint className="text-sm">View all</UnderDevelopmentHint>
+            <Link href="/payments" className="text-sm text-primary hover:underline">
+              View all
+            </Link>
           ) : null
         }
       >

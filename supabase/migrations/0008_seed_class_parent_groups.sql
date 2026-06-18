@@ -12,9 +12,9 @@ BEGIN
   END IF;
 END $$;
 
-DELETE FROM kidzee_mundhwa_contact
+DELETE FROM kidzee_vadgaonsheri_contact
 WHERE group_id IN (
-  SELECT id FROM kidzee_mundhwa_contact_group
+  SELECT id FROM kidzee_vadgaonsheri_contact_group
   WHERE id IN (
     'pg-nursery-parents-001',
     'pg-playgroup-parents-001',
@@ -23,7 +23,7 @@ WHERE group_id IN (
   )
 );
 
-DELETE FROM kidzee_mundhwa_contact_group
+DELETE FROM kidzee_vadgaonsheri_contact_group
 WHERE id IN (
   'pg-nursery-parents-001',
   'pg-playgroup-parents-001',
@@ -34,7 +34,7 @@ WHERE id IN (
 WITH owner AS (
   SELECT id FROM "user" ORDER BY created_at ASC LIMIT 1
 )
-INSERT INTO kidzee_mundhwa_contact_group (id, name, description, created_by)
+INSERT INTO kidzee_vadgaonsheri_contact_group (id, name, description, created_by)
 SELECT v.id, v.name, v.description, owner.id
 FROM owner
 CROSS JOIN (
@@ -46,7 +46,7 @@ CROSS JOIN (
 ) AS v(id, name, description);
 
 -- Nursery: 17 contacts (17 students)
-INSERT INTO kidzee_mundhwa_contact (id, group_id, name, phone_number, notes)
+INSERT INTO kidzee_vadgaonsheri_contact (id, group_id, name, phone_number, notes)
 VALUES
   ('pc-pg-nursery-parents-001-0001', 'pg-nursery-parents-001', 'japleen kaur', '919451135915', ''),
   ('pc-pg-nursery-parents-001-0002', 'pg-nursery-parents-001', 'Anvi sujit jagtap', '918390113693', ''),
@@ -68,7 +68,7 @@ VALUES
 
 -- Playgroup: skipped (no phone): prisha
 -- Playgroup: 5 contacts (6 students)
-INSERT INTO kidzee_mundhwa_contact (id, group_id, name, phone_number, notes)
+INSERT INTO kidzee_vadgaonsheri_contact (id, group_id, name, phone_number, notes)
 VALUES
   ('pc-pg-playgroup-parents-001-0001', 'pg-playgroup-parents-001', 'aarav peshne', '919284386633', ''),
   ('pc-pg-playgroup-parents-001-0002', 'pg-playgroup-parents-001', 'dhairya kshirsoyavr', '918793345044', ''),
@@ -78,7 +78,7 @@ VALUES
 
 -- Senior KG: skipped (no phone): aditya sinde
 -- Senior KG: 9 contacts (10 students)
-INSERT INTO kidzee_mundhwa_contact (id, group_id, name, phone_number, notes)
+INSERT INTO kidzee_vadgaonsheri_contact (id, group_id, name, phone_number, notes)
 VALUES
   ('pc-pg-sr-kg-parents-001-0001', 'pg-sr-kg-parents-001', 'abhimanyu kolpe', '917709442562', ''),
   ('pc-pg-sr-kg-parents-001-0002', 'pg-sr-kg-parents-001', 'daksh kumar', '918007569922', ''),
@@ -91,7 +91,7 @@ VALUES
   ('pc-pg-sr-kg-parents-001-0009', 'pg-sr-kg-parents-001', 'Chaithrika joggacheruvukindi', '919676302027', '');
 
 -- Junior KG: 19 contacts (19 students)
-INSERT INTO kidzee_mundhwa_contact (id, group_id, name, phone_number, notes)
+INSERT INTO kidzee_vadgaonsheri_contact (id, group_id, name, phone_number, notes)
 VALUES
   ('pc-pg-jr-kg-parents-001-0001', 'pg-jr-kg-parents-001', 'sumedh jogdankar', '919975264425', ''),
   ('pc-pg-jr-kg-parents-001-0002', 'pg-jr-kg-parents-001', 'mrunmayee shukla', '917798433879', ''),

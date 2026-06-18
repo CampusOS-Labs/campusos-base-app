@@ -3,6 +3,7 @@ import { WhatsappLogoIcon } from "@phosphor-icons/react/ssr"
 import { PageSection } from "@/components/page-layout"
 import { cn } from "@/lib/utils"
 
+// update group link after new group has been made
 const WHATSAPP_GROUP_HREF = "https://chat.whatsapp.com/ImWkA2PwJF5DF55ZEPQ8gj"
 const WHATSAPP_DIRECT_HREF = "https://wa.me/15137997001"
 const PHONE_HREF = "tel:+917385795779"

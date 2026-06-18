@@ -1,25 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import {
-  CalendarCheckIcon,
-  CreditCardIcon,
-  PaperPlaneTiltIcon,
-} from "@phosphor-icons/react"
+import { CreditCardIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react"
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { FEATURE_UNDER_DEVELOPMENT_MESSAGE } from "@/components/under-development-hint"
+import { isUnderDevelopmentRoute } from "@/lib/under-development-routes"
 
 const actions = [
-  {
-    href: "/attendance",
-    label: "Attendance",
-    icon: CalendarCheckIcon,
-    iconClass: "bg-sidebar-primary/15 text-sidebar-primary-foreground",
-    featured: false,
-    disabled: false,
-  },
   {
     href: "/announcements",
     label: "Send announcement",
@@ -34,7 +23,7 @@ const actions = [
     icon: CreditCardIcon,
     iconClass: "bg-sidebar-primary/15 text-sidebar-primary-foreground",
     featured: false,
-    disabled: false,
+    disabled: isUnderDevelopmentRoute("/payments"),
   },
 ] as const
 
@@ -97,7 +86,7 @@ export function HomeQuickActions() {
   return (
     <nav
       aria-label="Quick actions"
-      className="grid gap-2 sm:grid-cols-3 [&>*]:min-w-0 [&>*]:w-full"
+      className="grid grid-cols-2 gap-3 [&>*]:min-w-0 [&>*]:w-full"
     >
       {actions.map((action) => (
         <QuickActionCard key={action.href} action={action} />

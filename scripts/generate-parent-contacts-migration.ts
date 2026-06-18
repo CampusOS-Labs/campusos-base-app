@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE = path.resolve(__dirname, "../lib/config/parent contacts.md");
 const OUTPUT = path.resolve(
   __dirname,
-  "../supabase/migrations/0007_seed_class_parent_groups.sql",
+  "../supabase/migrations/0008_seed_class_parent_groups.sql",
 );
 
 const GROUPS = [
@@ -154,15 +154,15 @@ function buildSql(): string {
     "  END IF;",
     "END $$;",
     "",
-    "DELETE FROM kidzee_mundhwa_contact",
+    "DELETE FROM kidzee_vadgaonsheri_contact",
     "WHERE group_id IN (",
-    "  SELECT id FROM kidzee_mundhwa_contact_group",
+    "  SELECT id FROM kidzee_vadgaonsheri_contact_group",
     "  WHERE id IN (",
     GROUPS.map((group) => `    '${group.id}'`).join(",\n"),
     "  )",
     ");",
     "",
-    "DELETE FROM kidzee_mundhwa_contact_group",
+    "DELETE FROM kidzee_vadgaonsheri_contact_group",
     "WHERE id IN (",
     GROUPS.map((group) => `  '${group.id}'`).join(",\n"),
     ");",
@@ -170,7 +170,7 @@ function buildSql(): string {
     "WITH owner AS (",
     "  SELECT id FROM \"user\" ORDER BY created_at ASC LIMIT 1",
     ")",
-    "INSERT INTO kidzee_mundhwa_contact_group (id, name, description, created_by)",
+    "INSERT INTO kidzee_vadgaonsheri_contact_group (id, name, description, created_by)",
     "SELECT v.id, v.name, v.description, owner.id",
     "FROM owner",
     "CROSS JOIN (",
@@ -220,7 +220,7 @@ function buildSql(): string {
 
     lines.push(`-- ${group.name}: ${contacts.length} contacts (${rows.length} students)`);
     lines.push(
-      "INSERT INTO kidzee_mundhwa_contact (id, group_id, name, phone_number, notes)",
+      "INSERT INTO kidzee_vadgaonsheri_contact (id, group_id, name, phone_number, notes)",
       "VALUES",
     );
     lines.push(

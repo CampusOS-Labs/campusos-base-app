@@ -46,8 +46,15 @@ export function MetricStrip({
 }: {
   metrics: Array<{ value: React.ReactNode; label: string }>;
 }) {
+  const columnClass =
+    metrics.length === 1
+      ? "grid-cols-1"
+      : metrics.length === 2
+        ? "grid-cols-2"
+        : "sm:grid-cols-3";
+
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className={cn("grid gap-3", columnClass)}>
       {metrics.map((metric, index) => (
         <div
           key={index}

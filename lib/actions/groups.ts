@@ -7,8 +7,8 @@ import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { SCHOOL_ID } from "@/lib/constants";
 import {
-  kidzeeMundhwaContactGroup,
-  kidzeeMundhwaContact,
+  kidzeeVadgaonsheriContactGroup,
+  kidzeeVadgaonsheriContact,
 } from "@/lib/db/schema";
 import {
   GROUP_CONTACT_ADDED,
@@ -58,7 +58,7 @@ export async function createGroup(formData: FormData) {
   const id = crypto.randomUUID();
 
   await db.transaction(async (tx) => {
-    await tx.insert(kidzeeMundhwaContactGroup).values({
+    await tx.insert(kidzeeVadgaonsheriContactGroup).values({
       id,
       name,
       description,
@@ -66,7 +66,7 @@ export async function createGroup(formData: FormData) {
     });
 
     if (contacts.length > 0) {
-      await tx.insert(kidzeeMundhwaContact).values(
+      await tx.insert(kidzeeVadgaonsheriContact).values(
         contacts.map((contact) => ({
           id: crypto.randomUUID(),
           groupId: id,
@@ -109,16 +109,16 @@ export async function updateGroup(formData: FormData) {
 
   if (!groupId || !name) throw new Error("Group ID and name are required");
 
-  const existing = await db.query.kidzeeMundhwaContactGroup.findFirst({
-    where: and(eq(kidzeeMundhwaContactGroup.id, groupId), eq(kidzeeMundhwaContactGroup.createdBy, user.id)),
+  const existing = await db.query.kidzeeVadgaonsheriContactGroup.findFirst({
+    where: and(eq(kidzeeVadgaonsheriContactGroup.id, groupId), eq(kidzeeVadgaonsheriContactGroup.createdBy, user.id)),
   });
 
   if (!existing) throw new Error("Group not found");
 
   await db
-    .update(kidzeeMundhwaContactGroup)
+    .update(kidzeeVadgaonsheriContactGroup)
     .set({ name, description })
-    .where(eq(kidzeeMundhwaContactGroup.id, groupId));
+    .where(eq(kidzeeVadgaonsheriContactGroup.id, groupId));
 
   revalidatePath("/groups");
   revalidatePath("/announcements");
@@ -128,13 +128,13 @@ export async function deleteGroup(groupId: string) {
   const session = await auth.api.getSession({ headers: await headers() });
   const user = requireUser(session);
 
-  const existing = await db.query.kidzeeMundhwaContactGroup.findFirst({
-    where: and(eq(kidzeeMundhwaContactGroup.id, groupId), eq(kidzeeMundhwaContactGroup.createdBy, user.id)),
+  const existing = await db.query.kidzeeVadgaonsheriContactGroup.findFirst({
+    where: and(eq(kidzeeVadgaonsheriContactGroup.id, groupId), eq(kidzeeVadgaonsheriContactGroup.createdBy, user.id)),
   });
 
   if (!existing) throw new Error("Group not found");
 
-  await db.delete(kidzeeMundhwaContactGroup).where(eq(kidzeeMundhwaContactGroup.id, groupId));
+  await db.delete(kidzeeVadgaonsheriContactGroup).where(eq(kidzeeVadgaonsheriContactGroup.id, groupId));
 
   revalidatePath("/groups");
   revalidatePath("/announcements");
@@ -154,15 +154,15 @@ export async function addContact(formData: FormData) {
 
   if (!groupId || !name || !phoneNumber) throw new Error("Group ID, name, and phone number are required");
 
-  const group = await db.query.kidzeeMundhwaContactGroup.findFirst({
-    where: and(eq(kidzeeMundhwaContactGroup.id, groupId), eq(kidzeeMundhwaContactGroup.createdBy, user.id)),
+  const group = await db.query.kidzeeVadgaonsheriContactGroup.findFirst({
+    where: and(eq(kidzeeVadgaonsheriContactGroup.id, groupId), eq(kidzeeVadgaonsheriContactGroup.createdBy, user.id)),
   });
 
   if (!group) throw new Error("Group not found");
 
   const id = crypto.randomUUID();
 
-  await db.insert(kidzeeMundhwaContact).values({
+  await db.insert(kidzeeVadgaonsheriContact).values({
     id,
     groupId,
     name,
@@ -193,8 +193,8 @@ export async function updateContact(formData: FormData) {
 
   if (!contactId || !name || !phoneNumber) throw new Error("Contact ID, name, and phone number are required");
 
-  const existingContact = await db.query.kidzeeMundhwaContact.findFirst({
-    where: eq(kidzeeMundhwaContact.id, contactId),
+  const existingContact = await db.query.kidzeeVadgaonsheriContact.findFirst({
+    where: eq(kidzeeVadgaonsheriContact.id, contactId),
     with: { group: true },
   });
 
@@ -203,9 +203,9 @@ export async function updateContact(formData: FormData) {
   }
 
   await db
-    .update(kidzeeMundhwaContact)
+    .update(kidzeeVadgaonsheriContact)
     .set({ name, phoneNumber, notes })
-    .where(eq(kidzeeMundhwaContact.id, contactId));
+    .where(eq(kidzeeVadgaonsheriContact.id, contactId));
 
   revalidatePath("/groups");
   revalidatePath("/announcements");
@@ -215,8 +215,8 @@ export async function deleteContact(contactId: string) {
   const session = await auth.api.getSession({ headers: await headers() });
   const user = requireUser(session);
 
-  const existingContact = await db.query.kidzeeMundhwaContact.findFirst({
-    where: eq(kidzeeMundhwaContact.id, contactId),
+  const existingContact = await db.query.kidzeeVadgaonsheriContact.findFirst({
+    where: eq(kidzeeVadgaonsheriContact.id, contactId),
     with: { group: true },
   });
 
@@ -224,7 +224,7 @@ export async function deleteContact(contactId: string) {
     throw new Error("Contact not found");
   }
 
-  await db.delete(kidzeeMundhwaContact).where(eq(kidzeeMundhwaContact.id, contactId));
+  await db.delete(kidzeeVadgaonsheriContact).where(eq(kidzeeVadgaonsheriContact.id, contactId));
 
   revalidatePath("/groups");
   revalidatePath("/announcements");
