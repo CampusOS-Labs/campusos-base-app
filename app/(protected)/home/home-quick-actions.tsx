@@ -21,22 +21,14 @@ const actions = [
     featured: false,
     disabled: false,
   },
-  {
-    href: "/announcements",
-    label: "Send announcement",
-    icon: PaperPlaneTiltIcon,
-    iconClass: "bg-primary/10 text-primary",
-    featured: true,
-    disabled: false,
-  },
-  {
-    href: "/payments",
-    label: "Payments",
-    icon: CreditCardIcon,
-    iconClass: "bg-muted text-muted-foreground",
-    featured: false,
-    disabled: isUnderDevelopmentRoute("/payments"),
-  },
+  // {
+  //   href: "/announcements",
+  //   label: "Send announcement",
+  //   icon: PaperPlaneTiltIcon,
+  //   iconClass: "bg-primary/10 text-primary",
+  //   featured: true,
+  //   disabled: false,
+  // },
 ] as const
 
 function QuickActionCard({
@@ -98,7 +90,7 @@ export function HomeQuickActions() {
   return (
     <nav
       aria-label="Quick actions"
-      className="grid gap-2 sm:grid-cols-3 [&>*]:min-w-0 [&>*]:w-full"
+      className="grid gap-2 sm:grid-cols-2 [&>*]:min-w-0 [&>*]:w-full"
     >
       {actions.map((action) => (
         <QuickActionCard key={action.href} action={action} />
