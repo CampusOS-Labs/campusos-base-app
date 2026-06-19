@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/dialog";
 import { WizardStep, WizardStepBadge } from "@/components/wizard-step";
 import { logAnnouncement } from "@/lib/actions/announcements";
-import { ANNOUNCEMENT_TYPES } from "@/lib/announcement-types";
 import { trackAuthEvent } from "@/lib/analytics/track-event-client";
 import {
   ANNOUNCEMENT_FLOW_STEP,
@@ -31,6 +30,7 @@ import {
 import type { Invoice as ServiceInvoice } from "@/lib/services/invoices";
 import { ComposeDialog } from "./components/compose-dialog";
 import type { SelectedFile } from "./components/compose-form";
+import { MessageTypePicker } from "./components/message-type-picker";
 import { WhatsAppPanel } from "./components/whatsapp-panel";
 
 type Invoice = ServiceInvoice;
@@ -195,7 +195,6 @@ function AnnouncementsClientInner({
   const [sending, setSending] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [showSendConfirm, setShowSendConfirm] = useState(false);
-
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollAttemptsRef = useRef(0);
   const connectFlowActiveRef = useRef(false);
@@ -701,16 +700,6 @@ function AnnouncementsClientInner({
     [audienceGroups],
   );
 
-  const typeOptions = useMemo(
-    () =>
-      ANNOUNCEMENT_TYPES.map((type) => ({
-        value: type.id,
-        label: type.label,
-        description: type.description,
-      })),
-    [],
-  );
-
   const canOpenCompose =
     isWhatsAppReady && selectedAudience.length > 0 && recipientCount > 0 && annType.length > 0;
 
@@ -770,12 +759,9 @@ function AnnouncementsClientInner({
               disabled={!isWhatsAppReady || audienceOptions.length === 0}
             />
 
-            <SearchableCombobox
-              label="What kind of message?"
-              options={typeOptions}
-              value={annType || null}
+            <MessageTypePicker
+              value={annType}
               onValueChange={handleTypeChange}
-              placeholder="Search or type message type…"
               disabled={!isWhatsAppReady}
             />
 
