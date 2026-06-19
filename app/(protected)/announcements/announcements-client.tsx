@@ -198,6 +198,7 @@ function AnnouncementsClientInner({
 
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollAttemptsRef = useRef(0);
+  const connectFlowActiveRef = useRef(false);
   const parentsMapRef = useRef<Map<string, Recipient>>(new Map());
   const flowStartTimeRef = useRef(Date.now());
   const whatsappOpenTrackedRef = useRef(false);
@@ -234,35 +235,42 @@ function AnnouncementsClientInner({
     await api("POST", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME }).catch(() => {});
     try {
       const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/state`);
-      const state = data?.instance?.state || "close";
+      const state = String(data?.instance?.state || data?.state || "close").toLowerCase();
       if (state === "open") {
         applyConnectionState("open");
-      } else if (state === "connecting" || state === "syncing") {
-        setConnectionState("connecting");
-        setStatus("Connecting to WhatsApp...");
-        startPolling();
-      } else if (state === "unknown") {
-        setConnectionState("unknown");
-        setStatus("Unable to confirm connection. Retrying...");
-        startPolling();
-      } else {
-        setConnectionState("close");
-        setStatus("WhatsApp disconnected.");
+        return;
       }
+      setConnectionState("close");
+      setQrCode(null);
+      setStatus("WhatsApp disconnected.");
     } catch {
       setConnectionState("close");
+      setQrCode(null);
+      setStatus("WhatsApp disconnected.");
+    }
+  }
+
+  function stopPolling() {
+    connectFlowActiveRef.current = false;
+    if (pollRef.current) {
+      clearTimeout(pollRef.current);
+      pollRef.current = null;
     }
   }
 
   function startPolling() {
+    connectFlowActiveRef.current = true;
     pollAttemptsRef.current = 0;
     if (pollRef.current) clearTimeout(pollRef.current);
     pollRef.current = setTimeout(() => pollConnectionState(), 3000);
   }
 
   async function pollConnectionState() {
+    if (!connectFlowActiveRef.current) return;
+
     pollAttemptsRef.current += 1;
     if (pollAttemptsRef.current > 30) {
+      stopPolling();
       setQrCode(null);
       setConnectionState("close");
       setStatus("Connection expired. Try again.", true);
@@ -272,6 +280,7 @@ function AnnouncementsClientInner({
       const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/state`);
       const state: string = data?.instance?.state || data?.state || "unknown";
       if (state === "open") {
+        stopPolling();
         applyConnectionState("open");
         return;
       }
@@ -280,6 +289,7 @@ function AnnouncementsClientInner({
           pollRef.current = setTimeout(pollConnectionState, 2500);
           return;
         }
+        stopPolling();
         setQrCode(null);
         setConnectionState("close");
         setStatus("Connection expired. Try again.", true);
@@ -294,6 +304,7 @@ function AnnouncementsClientInner({
   async function onConnect() {
     try {
       setIsRunning(true);
+      stopPolling();
       await api("POST", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME }).catch(() => {});
       const stateData = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/state`);
       const state = stateData?.instance?.state || stateData?.state || "";
@@ -331,6 +342,7 @@ function AnnouncementsClientInner({
   async function onLogout() {
     try {
       setIsRunning(true);
+      stopPolling();
       await api("DELETE", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME });
       setConnectionState("close");
       setQrCode(null);
@@ -647,7 +659,7 @@ function AnnouncementsClientInner({
     checkInitialState();
     loadAudienceGroups();
     return () => {
-      if (pollRef.current) clearTimeout(pollRef.current);
+      stopPolling();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
