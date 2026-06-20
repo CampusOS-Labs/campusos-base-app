@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { NotePencilIcon } from "@phosphor-icons/react";
 
 import { PageHeader, PageShell } from "@/components/page-layout";
-import { SearchableCombobox } from "@/components/searchable-combobox";
+import { AudiencePicker } from "./components/audience-picker";
 import { StatusBanner } from "@/components/status-banner";
 import { Button } from "@/components/ui/button";
 import {
@@ -686,16 +686,6 @@ function AnnouncementsClientInner({
   const recipientCount = groupRecipients.length;
   const selectedAudienceGroup = audienceGroups.find((group) => group.id === selectedAudience);
 
-  const audienceOptions = useMemo(
-    () =>
-      audienceGroups.map((group) => ({
-        value: group.id,
-        label: group.label,
-        description: group.help,
-      })),
-    [audienceGroups],
-  );
-
   const canOpenCompose =
     isWhatsAppReady && selectedAudience.length > 0 && recipientCount > 0 && annType.length > 0;
 
@@ -746,13 +736,15 @@ function AnnouncementsClientInner({
           }
         >
           <div className="space-y-5">
-            <SearchableCombobox
-              label="Who receives this?"
-              options={audienceOptions}
-              value={selectedAudience || null}
+            <AudiencePicker
+              options={audienceGroups.map((group) => ({
+                value: group.id,
+                label: group.label,
+                description: group.help,
+              }))}
+              value={selectedAudience}
               onValueChange={handleAudienceChange}
-              placeholder="Search parents or groups…"
-              disabled={!isWhatsAppReady || audienceOptions.length === 0}
+              disabled={!isWhatsAppReady || audienceGroups.length === 0}
             />
 
             <MessageTypePicker
