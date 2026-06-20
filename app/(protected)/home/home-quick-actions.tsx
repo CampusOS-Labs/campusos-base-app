@@ -14,7 +14,6 @@ const actions = [
     label: "Send announcement",
     icon: PaperPlaneTiltIcon,
     iconClass: "bg-primary/10 text-primary",
-    featured: true,
     disabled: false,
   },
   {
@@ -22,7 +21,6 @@ const actions = [
     label: "Payments",
     icon: CreditCardIcon,
     iconClass: "bg-sidebar-primary/15 text-sidebar-primary-foreground",
-    featured: false,
     disabled: isUnderDevelopmentRoute("/payments"),
   },
 ] as const
@@ -74,7 +72,6 @@ function QuickActionCard({
       className={cn(
         "group ui-press flex w-full min-w-0 items-center gap-3 rounded-xl border border-border/80 bg-card px-4 py-3.5 shadow-xs ring-1 ring-foreground/[0.04] transition-[background-color,box-shadow,border-color] duration-150 ease-out",
         "hover:border-border hover:bg-muted/30 hover:shadow-sm",
-        action.featured && "border-primary/20 bg-primary/[0.03]",
       )}
     >
       {content}
