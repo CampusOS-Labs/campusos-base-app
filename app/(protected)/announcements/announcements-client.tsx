@@ -134,7 +134,7 @@ async function api(method: string, path: string, body?: unknown) {
 
 const TYPE_LABELS: Record<string, string> = {
   announcement: "Announcement",
-  activities: "Activities",
+  activities: "Announcement",
   "payment-reminder": "Payment Reminder",
   media: "Media",
 };
