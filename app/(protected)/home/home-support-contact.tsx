@@ -4,9 +4,17 @@ import { PageSection } from "@/components/page-layout"
 import { cn } from "@/lib/utils"
 
 // update group link after new group has been made
-const WHATSAPP_GROUP_HREF = "https://chat.whatsapp.com/ImWkA2PwJF5DF55ZEPQ8gj"
-const WHATSAPP_DIRECT_HREF = "https://wa.me/15137997001"
-const PHONE_HREF = "tel:+917385795779"
+const WHATSAPP_GROUP_HREF = "https://chat.whatsapp.com/LlN5pceDVWv2QkMGSFJcxB"
+const SUPPORT_CONTACTS = [
+  {
+    label: "+1 (513) 799-7001",
+    whatsappHref: "https://wa.me/15137997001",
+  },
+  {
+    label: "+91 70386 67755",
+    whatsappHref: "https://wa.me/917038667755",
+  },
+] as const
 
 export function HomeSupportContact() {
   return (
@@ -44,21 +52,19 @@ export function HomeSupportContact() {
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/80 px-4 py-2.5 text-xs text-muted-foreground">
           <span>Or reach us directly:</span>
-          <a
-            href={WHATSAPP_DIRECT_HREF}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ui-press font-medium tabular-nums text-foreground transition-colors duration-150 ease-out hover:text-primary"
-          >
-            +1 (513) 799-7001
-          </a>
-          <span aria-hidden="true">·</span>
-          <a
-            href={PHONE_HREF}
-            className="ui-press font-medium tabular-nums text-foreground transition-colors duration-150 ease-out hover:text-primary"
-          >
-            +91 73857 95779
-          </a>
+          {SUPPORT_CONTACTS.map((contact, index) => (
+            <span key={contact.label} className="inline-flex items-center gap-x-3">
+              {index > 0 ? <span aria-hidden="true">·</span> : null}
+              <a
+                href={contact.whatsappHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ui-press font-medium tabular-nums text-foreground transition-colors duration-150 ease-out hover:text-primary"
+              >
+                {contact.label}
+              </a>
+            </span>
+          ))}
         </div>
       </div>
     </PageSection>
