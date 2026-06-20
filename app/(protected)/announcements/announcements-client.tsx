@@ -668,22 +668,18 @@ function AnnouncementsClientInner({
         `Please complete your pending fee payment using your secure link:\n${paymentLinkForInvoice(invoiceParam)}`,
       );
       setAnnType("payment-reminder");
+      if (recipientsByAudience.has("unpaid-parents")) {
+        handleAudienceChange("unpaid-parents");
+      }
       setComposeOpen(true);
     }
-  }, [invoiceParam, message]);
+  }, [invoiceParam, message, recipientsByAudience]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (audienceParam && recipientsByAudience.has(audienceParam)) {
       handleAudienceChange(audienceParam);
-      return;
     }
-    if (recipientsByAudience.size > 0) {
-      const targetId = annType === "payment-reminder" ? "unpaid-parents" : "all-parents";
-      if (recipientsByAudience.has(targetId)) {
-        handleAudienceChange(targetId);
-      }
-    }
-  }, [recipientsByAudience, annType, audienceParam]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [audienceParam, recipientsByAudience]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isWhatsAppReady = connectionState === "open";
   const isMedia = annType === "media";
