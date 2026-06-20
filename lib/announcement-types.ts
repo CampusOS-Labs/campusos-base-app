@@ -3,12 +3,10 @@ import {
   CurrencyCircleDollarIcon,
   ImageIcon,
   MegaphoneIcon,
-  TargetIcon,
 } from "@phosphor-icons/react/ssr";
 
 export const ANNOUNCEMENT_TYPE_IDS = [
   "announcement",
-  "activities",
   "payment-reminder",
   "media",
 ] as const;
@@ -32,13 +30,6 @@ export const ANNOUNCEMENT_TYPES: AnnouncementTypeMeta[] = [
     iconClass: "bg-primary/10 text-primary",
   },
   {
-    id: "activities",
-    label: "Activities",
-    description: "Events & programs",
-    icon: TargetIcon,
-    iconClass: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-  },
-  {
     id: "payment-reminder",
     label: "Payment",
     description: "Fee reminders + links",
@@ -55,7 +46,8 @@ export const ANNOUNCEMENT_TYPES: AnnouncementTypeMeta[] = [
 ];
 
 export function getAnnouncementTypeMeta(type: string): AnnouncementTypeMeta {
-  const match = ANNOUNCEMENT_TYPES.find((entry) => entry.id === type);
+  const normalizedType = type === "activities" ? "announcement" : type;
+  const match = ANNOUNCEMENT_TYPES.find((entry) => entry.id === normalizedType);
   if (match) return match;
 
   return {
