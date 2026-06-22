@@ -131,9 +131,24 @@ export class WhatsAppManager {
       return { state: mappedState, qr: null }
     } catch {
       const inst = this.instances.get(name)
-      if (inst) return { state: inst.state, qr: null }
+      if (inst) {
+        // Avoid stale false positives ("open" from cache) when provider state lookup fails.
+        inst.state = "close"
+        this.instances.set(name, inst)
+        return { state: "close", qr: null }
+      }
       return { state: "unknown" }
     }
+  }
+
+  private isInvalidConnectionError(error: unknown): boolean {
+    if (error instanceof EvolutionHttpError) {
+      const text = JSON.stringify(error.payload || error.message).toLowerCase()
+      return text.includes("invalid connection")
+    }
+
+    const message = error instanceof Error ? error.message : String(error || "")
+    return message.toLowerCase().includes("invalid connection")
   }
 
   async connect(
@@ -182,11 +197,18 @@ export class WhatsAppManager {
   }
 
   async sendMessage(name: string, number: string, text: string, delay?: number): Promise<void> {
-    await this.api("POST", `/message/sendText/${encodeURIComponent(name)}`, {
-      number,
-      text,
-      delay: delay ?? 1200,
-    })
+    try {
+      await this.api("POST", `/message/sendText/${encodeURIComponent(name)}`, {
+        number,
+        text,
+        delay: delay ?? 1200,
+      })
+    } catch (error) {
+      if (this.isInvalidConnectionError(error)) {
+        this.instances.set(name, { state: "close" })
+      }
+      throw error
+    }
   }
 
   async sendMedia(
@@ -201,14 +223,21 @@ export class WhatsAppManager {
     const cleanMedia = media.startsWith("data:")
       ? media.slice(media.indexOf(",") + 1)
       : media
-    await this.api("POST", `/message/sendMedia/${encodeURIComponent(name)}`, {
-      number,
-      mediatype,
-      media: cleanMedia,
-      caption,
-      fileName,
-      delay: delay ?? 1200,
-    })
+    try {
+      await this.api("POST", `/message/sendMedia/${encodeURIComponent(name)}`, {
+        number,
+        mediatype,
+        media: cleanMedia,
+        caption,
+        fileName,
+        delay: delay ?? 1200,
+      })
+    } catch (error) {
+      if (this.isInvalidConnectionError(error)) {
+        this.instances.set(name, { state: "close" })
+      }
+      throw error
+    }
   }
 
   async validateNumbers(

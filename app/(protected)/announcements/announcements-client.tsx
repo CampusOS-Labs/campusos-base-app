@@ -132,6 +132,11 @@ async function api(method: string, path: string, body?: unknown) {
   }
 }
 
+function isInvalidConnectionError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return message.toLowerCase().includes("invalid connection");
+}
+
 const TYPE_LABELS: Record<string, string> = {
   announcement: "Announcement",
   activities: "Announcement",
@@ -268,7 +273,20 @@ function AnnouncementsClientInner({
     if (!connectFlowActiveRef.current) return;
 
     pollAttemptsRef.current += 1;
-    if (pollAttemptsRef.current > 30) {
+    // Keep polling longer because WhatsApp pairing can take >60s after scan.
+    if (pollAttemptsRef.current > 60) {
+      try {
+        const finalData = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/state`);
+        const finalState = String(finalData?.instance?.state || finalData?.state || "unknown")
+          .toLowerCase();
+        if (finalState === "open") {
+          stopPolling();
+          applyConnectionState("open");
+          return;
+        }
+      } catch {
+        // Fall through to timeout handling.
+      }
       stopPolling();
       setQrCode(null);
       setConnectionState("close");
@@ -277,21 +295,15 @@ function AnnouncementsClientInner({
     }
     try {
       const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/state`);
-      const state: string = data?.instance?.state || data?.state || "unknown";
+      const state = String(data?.instance?.state || data?.state || "unknown").toLowerCase();
       if (state === "open") {
         stopPolling();
         applyConnectionState("open");
         return;
       }
       if (state === "close") {
-        if (pollAttemptsRef.current < 5) {
-          pollRef.current = setTimeout(pollConnectionState, 2500);
-          return;
-        }
-        stopPolling();
-        setQrCode(null);
-        setConnectionState("close");
-        setStatus("Connection expired. Try again.", true);
+        // "close" can be transient right after scan; don't expire early.
+        pollRef.current = setTimeout(pollConnectionState, 3000);
         return;
       }
       pollRef.current = setTimeout(pollConnectionState, state === "unknown" ? 3000 : 2000);
@@ -555,6 +567,7 @@ function AnnouncementsClientInner({
       }
 
       const results: Array<{ phone: string; ok: boolean }> = [];
+      let invalidConnectionDetected = false;
       for (let index = 0; index < recipientsToSend.length; index++) {
         const recipient = recipientsToSend[index];
         setStatus(`Sending ${index + 1} of ${recipientsToSend.length}...`);
@@ -571,7 +584,14 @@ function AnnouncementsClientInner({
               delay: 1200,
             });
             results.push({ phone: recipient.phone, ok: true });
-          } catch {
+          } catch (error) {
+            if (isInvalidConnectionError(error)) {
+              invalidConnectionDetected = true;
+              setConnectionState("close");
+              setQrCode(null);
+              setStatus("WhatsApp session is invalid. Reconnect and try again.", true);
+              break;
+            }
             results.push({ phone: recipient.phone, ok: false });
           }
         } else {
@@ -592,14 +612,30 @@ function AnnouncementsClientInner({
               delay: 1200,
             });
             results.push({ phone: recipient.phone, ok: true });
-          } catch {
+          } catch (error) {
+            if (isInvalidConnectionError(error)) {
+              invalidConnectionDetected = true;
+              setConnectionState("close");
+              setQrCode(null);
+              setStatus("WhatsApp session is invalid. Reconnect and try again.", true);
+              break;
+            }
             results.push({ phone: recipient.phone, ok: false });
           }
+        }
+
+        if (invalidConnectionDetected) {
+          break;
         }
 
         if (index < recipientsToSend.length - 1) {
           await new Promise((resolve) => setTimeout(resolve, randomDelay(4000, 9000)));
         }
+      }
+
+      if (invalidConnectionDetected) {
+        setSending(false);
+        return;
       }
 
       const sentCount = results.filter((result) => result.ok).length;
