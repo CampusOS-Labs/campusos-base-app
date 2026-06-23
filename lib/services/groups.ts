@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
@@ -9,7 +9,6 @@ export async function getUserGroups() {
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   const groups = await db.query.kidzeeVadgaonsheriContactGroup.findMany({
-    where: eq(kidzeeVadgaonsheriContactGroup.createdBy, session.user.id),
     with: {
       contacts: true,
     },
@@ -30,7 +29,7 @@ export async function getGroupWithContacts(groupId: string) {
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   const group = await db.query.kidzeeVadgaonsheriContactGroup.findFirst({
-    where: and(eq(kidzeeVadgaonsheriContactGroup.id, groupId), eq(kidzeeVadgaonsheriContactGroup.createdBy, session.user.id)),
+    where: eq(kidzeeVadgaonsheriContactGroup.id, groupId),
     with: {
       contacts: {
         orderBy: (c, { asc }) => [asc(c.name)],
