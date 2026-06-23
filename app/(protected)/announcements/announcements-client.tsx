@@ -112,9 +112,9 @@ function randomDelay(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-async function api(method: string, path: string, body?: unknown) {
+async function api(method: string, path: string, body?: unknown, timeoutMs = 15000) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(path, {
       method,
@@ -394,14 +394,6 @@ function AnnouncementsClientInner({
       }
       parentsMapRef.current = parentsMap;
 
-      const unpaidParents = Array.from(parentsMap.values())
-        .map((recipient) => ({
-          ...recipient,
-          invoices: recipient.invoices.filter((invoice) => invoice.status === "pending"),
-        }))
-        .filter((recipient) => recipient.invoices.length > 0)
-        .sort((a, b) => a.parentName.localeCompare(b.parentName));
-
       const { getGroupWithContacts } = await import("@/lib/actions/groups");
       const groupContactsData = await Promise.all(
         userGroups
@@ -413,15 +405,18 @@ function AnnouncementsClientInner({
 
       const allParentsMap = new Map<string, Recipient>();
       for (const { group, data: groupData } of groupContactsData) {
-        const recipients: Recipient[] = groupData.contacts.map((contact) => {
-          const phone = contact.phoneNumber;
-          const fromInvoice = parentsMap.get(normalizePhone(phone));
-          return {
-            phone,
-            parentName: contact.name,
-            invoices: fromInvoice?.invoices ?? [],
-          };
-        });
+        const recipients: Recipient[] = groupData.contacts
+          .map((contact) => {
+            const phone = normalizePhone(contact.phoneNumber);
+            if (!phone) return null;
+            const fromInvoice = parentsMap.get(phone);
+            return {
+              phone,
+              parentName: contact.name,
+              invoices: fromInvoice?.invoices ?? [],
+            };
+          })
+          .filter((recipient): recipient is Recipient => recipient !== null);
         for (const recipient of recipients) {
           const key = normalizePhone(recipient.phone);
           if (!allParentsMap.has(key)) allParentsMap.set(key, recipient);
@@ -442,29 +437,19 @@ function AnnouncementsClientInner({
           : Array.from(parentsMap.values())
       ).sort((a, b) => a.parentName.localeCompare(b.parentName));
 
-      groups.unshift(
-        {
-          id: "unpaid-parents",
-          label: `Unpaid Parents (${unpaidParents.length})`,
-          help: "Parents with pending invoices",
-          recipients: unpaidParents,
-        },
-        {
-          id: "all-parents",
-          label: `All Parents (${allParents.length})`,
-          help: "Everyone in your contact groups",
-          recipients: allParents,
-        },
-      );
-      map.set("unpaid-parents", unpaidParents);
+      groups.unshift({
+        id: "all-parents",
+        label: `All Parents (${allParents.length})`,
+        help: "Everyone in your contact groups",
+        recipients: allParents,
+      });
       map.set("all-parents", allParents);
 
       setAudienceGroups(groups);
       setRecipientsByAudience(map);
 
       if (groups.length > 0) {
-        const defaultId = annType === "payment-reminder" ? "unpaid-parents" : "all-parents";
-        const firstId = groups.find((group) => group.id === defaultId)?.id ?? groups[0].id;
+        const firstId = groups.find((group) => group.id === "all-parents")?.id ?? groups[0].id;
         setSelectedAudience(firstId);
         setGroupRecipients(map.get(firstId) || []);
       }
@@ -485,9 +470,6 @@ function AnnouncementsClientInner({
   function handleTypeChange(type: string) {
     setAnnType(type);
     if (type !== "media") setSelectedFile(null);
-    if (type === "payment-reminder" && recipientsByAudience.has("unpaid-parents")) {
-      handleAudienceChange("unpaid-parents");
-    }
   }
 
   async function onSend() {
@@ -544,9 +526,14 @@ function AnnouncementsClientInner({
     try {
       let validPhoneSet = new Set(allRecipients.map((recipient) => normalizePhone(recipient.phone)));
       try {
-        const validation = await api("POST", `/api/whatsapp/instance/${INSTANCE_NAME}/validate`, {
-          numbers: allRecipients.map((recipient) => recipient.phone),
-        });
+        const validation = await api(
+          "POST",
+          `/api/whatsapp/instance/${INSTANCE_NAME}/validate`,
+          {
+            numbers: allRecipients.map((recipient) => recipient.phone),
+          },
+          30000,
+        );
         validPhoneSet = new Set(
           validation
             .filter((item: { exists: boolean }) => item.exists)
@@ -566,7 +553,7 @@ function AnnouncementsClientInner({
         return;
       }
 
-      const results: Array<{ phone: string; ok: boolean }> = [];
+      const results: Array<{ phone: string; ok: boolean; error?: string }> = [];
       let invalidConnectionDetected = false;
       for (let index = 0; index < recipientsToSend.length; index++) {
         const recipient = recipientsToSend[index];
@@ -574,15 +561,24 @@ function AnnouncementsClientInner({
 
         if (isMedia && selectedFile) {
           const caption = [`${typeLabel}: ${titleTrimmed}`, "", messageTrimmed].join("\n").trim();
+          // Video uploads through Evolution can appear "sent" but fail to arrive.
+          // Sending video as a document attachment is more reliable for delivery.
+          const transportMediaType =
+            selectedFile.mediatype === "video" ? "document" : selectedFile.mediatype;
           try {
-            await api("POST", `/api/whatsapp/instance/${INSTANCE_NAME}/send-media`, {
-              number: recipient.phone,
-              mediatype: selectedFile.mediatype,
-              media: selectedFile.base64,
-              caption,
-              fileName: selectedFile.name,
-              delay: 1200,
-            });
+            await api(
+              "POST",
+              `/api/whatsapp/instance/${INSTANCE_NAME}/send-media`,
+              {
+                number: recipient.phone,
+                mediatype: transportMediaType,
+                media: selectedFile.base64,
+                caption,
+                fileName: selectedFile.name,
+                delay: 1200,
+              },
+              90000,
+            );
             results.push({ phone: recipient.phone, ok: true });
           } catch (error) {
             if (isInvalidConnectionError(error)) {
@@ -592,7 +588,8 @@ function AnnouncementsClientInner({
               setStatus("WhatsApp session is invalid. Reconnect and try again.", true);
               break;
             }
-            results.push({ phone: recipient.phone, ok: false });
+            const reason = error instanceof Error ? error.message : "Failed to send media";
+            results.push({ phone: recipient.phone, ok: false, error: reason });
           }
         } else {
           const textLines = [`${typeLabel}: ${titleTrimmed}`, "", messageTrimmed];
@@ -606,11 +603,16 @@ function AnnouncementsClientInner({
           }
           const text = textLines.join("\n");
           try {
-            await api("POST", `/api/whatsapp/instance/${INSTANCE_NAME}/send`, {
-              number: recipient.phone,
-              text,
-              delay: 1200,
-            });
+            await api(
+              "POST",
+              `/api/whatsapp/instance/${INSTANCE_NAME}/send`,
+              {
+                number: recipient.phone,
+                text,
+                delay: 1200,
+              },
+              30000,
+            );
             results.push({ phone: recipient.phone, ok: true });
           } catch (error) {
             if (isInvalidConnectionError(error)) {
@@ -620,7 +622,8 @@ function AnnouncementsClientInner({
               setStatus("WhatsApp session is invalid. Reconnect and try again.", true);
               break;
             }
-            results.push({ phone: recipient.phone, ok: false });
+            const reason = error instanceof Error ? error.message : "Failed to send message";
+            results.push({ phone: recipient.phone, ok: false, error: reason });
           }
         }
 
@@ -676,7 +679,9 @@ function AnnouncementsClientInner({
       setComposeOpen(false);
 
       if (failedCount > 0) {
-        setStatus(`Sent to ${sentCount} contact(s). ${failedCount} failed.`, true);
+        const firstFailure = results.find((result) => !result.ok)?.error;
+        const details = firstFailure ? ` First error: ${firstFailure}` : "";
+        setStatus(`Sent to ${sentCount} contact(s). ${failedCount} failed.${details}`, true);
       } else {
         setStatus(`Sent to ${sentCount} contact(s).`);
       }
@@ -704,9 +709,6 @@ function AnnouncementsClientInner({
         `Please complete your pending fee payment using your secure link:\n${paymentLinkForInvoice(invoiceParam)}`,
       );
       setAnnType("payment-reminder");
-      if (recipientsByAudience.has("unpaid-parents")) {
-        handleAudienceChange("unpaid-parents");
-      }
       setComposeOpen(true);
     }
   }, [invoiceParam, message, recipientsByAudience]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -70,7 +70,7 @@ export class WhatsAppManager {
 
   private async api(method: string, path: string, body?: unknown): Promise<any> {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 15000)
+    const timer = setTimeout(() => controller.abort(), 60000)
     try {
       const res = await fetch(`${config.baseUrl}${path}`, {
         method,
@@ -97,11 +97,26 @@ export class WhatsAppManager {
       }
       const text = await res.text().catch(() => "")
       if (!text) return {}
+
+      let data: any
       try {
-        return JSON.parse(text)
+        data = JSON.parse(text)
       } catch {
         return { raw: text }
       }
+
+      // Evolution can occasionally return HTTP 200/201 with an embedded failure shape:
+      // { status: 4xx/5xx, error: "...", response: { message: [...] } }
+      const embeddedStatus = typeof data?.status === "number" ? data.status : null
+      if (embeddedStatus !== null && embeddedStatus >= 400) {
+        throw new EvolutionHttpError(
+          embeddedStatus,
+          `Evolution API embedded error ${embeddedStatus}: ${String(data?.error || "unknown error")}`,
+          data,
+        )
+      }
+
+      return data
     } finally {
       clearTimeout(timer)
     }

@@ -57,7 +57,6 @@ export function PaymentsClient({ invoices }: { invoices: Invoice[] }) {
     trackAuthEvent(PAYMENT_REMINDER_STARTED, { invoiceId })
     const url = new URL("/announcements", window.location.origin)
     url.searchParams.set("invoice", invoiceId)
-    url.searchParams.set("audience", "unpaid-parents")
     window.location.href = url.toString()
   }, [])
 
@@ -68,7 +67,7 @@ export function PaymentsClient({ invoices }: { invoices: Invoice[] }) {
     <PageShell>
       <PageHeader
         title="Payments"
-        description="Track unpaid invoices and send payment reminders."
+        description="Track invoices and send payment reminders."
       />
 
       <MetricStrip
@@ -78,11 +77,11 @@ export function PaymentsClient({ invoices }: { invoices: Invoice[] }) {
         ]}
       />
 
-      <PageSection title="Unpaid invoices">
-        {unpaid.length === 0 ? (
+      <PageSection title="Invoices">
+        {invoices.length === 0 ? (
           <EmptyState
-            title="No unpaid invoices"
-            description="All invoices are paid up right now."
+            title="No invoices"
+            description="Invoices will appear here when available."
           />
         ) : (
           <DataTable>
@@ -92,11 +91,12 @@ export function PaymentsClient({ invoices }: { invoices: Invoice[] }) {
                 <th className="px-4 py-3 font-medium">Parent</th>
                 <th className="px-4 py-3 text-right font-medium">Amount</th>
                 <th className="px-4 py-3 font-medium">Due</th>
+                <th className="px-4 py-3 font-medium">Status</th>
                 <th className="py-3 pl-4 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {unpaid.map((inv) => (
+              {invoices.map((inv) => (
                 <tr key={inv.invoiceNumber} className="hover:bg-muted/30">
                   <td className="py-3 pr-4">
                     <div className="font-medium">{inv.student.name}</div>
@@ -110,6 +110,11 @@ export function PaymentsClient({ invoices }: { invoices: Invoice[] }) {
                     {formatCurrencyRaw(inv.totalAmount)}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{formatDate(inv.dueDate)}</td>
+                  <td className="px-4 py-3">
+                    <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {inv.status}
+                    </span>
+                  </td>
                   <td className="py-3 pl-4 text-right">
                     <div className="flex justify-end gap-1">
                       <Button
@@ -119,7 +124,11 @@ export function PaymentsClient({ invoices }: { invoices: Invoice[] }) {
                       >
                         <Copy /> Copy link
                       </Button>
-                      <Button size="xs" onClick={() => remindToPay(inv.invoiceNumber)}>
+                      <Button
+                        size="xs"
+                        disabled={inv.status !== "pending"}
+                        onClick={() => remindToPay(inv.invoiceNumber)}
+                      >
                         <Bell /> Remind
                       </Button>
                     </div>
