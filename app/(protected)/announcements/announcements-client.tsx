@@ -405,18 +405,24 @@ function AnnouncementsClientInner({
 
       const allParentsMap = new Map<string, Recipient>();
       for (const { group, data: groupData } of groupContactsData) {
-        const recipients: Recipient[] = groupData.contacts
-          .map((contact) => {
-            const phone = normalizePhone(contact.phoneNumber);
-            if (!phone) return null;
-            const fromInvoice = parentsMap.get(phone);
-            return {
-              phone,
-              parentName: contact.name,
-              invoices: fromInvoice?.invoices ?? [],
-            };
-          })
-          .filter((recipient): recipient is Recipient => recipient !== null);
+        const recipients: Recipient[] = groupData.contacts.flatMap((contact) => {
+          const entries = [
+            { name: contact.fatherName, phone: contact.fatherPhoneNumber },
+            { name: contact.motherName, phone: contact.motherPhoneNumber },
+          ];
+          return entries
+            .map((entry) => {
+              const phone = normalizePhone(entry.phone || "");
+              if (!phone) return null;
+              const fromInvoice = parentsMap.get(phone);
+              return {
+                phone,
+                parentName: entry.name || contact.name,
+                invoices: fromInvoice?.invoices ?? [],
+              };
+            })
+            .filter((recipient): recipient is Recipient => recipient !== null);
+        });
         for (const recipient of recipients) {
           const key = normalizePhone(recipient.phone);
           if (!allParentsMap.has(key)) allParentsMap.set(key, recipient);

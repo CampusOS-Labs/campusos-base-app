@@ -49,6 +49,10 @@ export async function getGroupWithContacts(groupId: string) {
       id: c.id,
       name: c.name,
       phoneNumber: c.phoneNumber,
+      fatherName: c.fatherName,
+      fatherPhoneNumber: c.fatherPhoneNumber,
+      motherName: c.motherName,
+      motherPhoneNumber: c.motherPhoneNumber,
       notes: c.notes,
     })),
   };

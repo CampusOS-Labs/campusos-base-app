@@ -35,7 +35,14 @@ export async function createGroup(formData: FormData) {
 
   if (!name) throw new Error("Group name is required");
 
-  type ContactInput = { name: string; phoneNumber: string; notes: string | null };
+  type ContactInput = {
+    name: string;
+    fatherName: string | null;
+    fatherPhoneNumber: string | null;
+    motherName: string | null;
+    motherPhoneNumber: string | null;
+    notes: string | null;
+  };
   let contacts: ContactInput[] = [];
 
   if (contactsRaw) {
@@ -45,10 +52,17 @@ export async function createGroup(formData: FormData) {
         contacts = parsed
           .map((contact) => ({
             name: String(contact?.name ?? "").trim(),
-            phoneNumber: String(contact?.phoneNumber ?? "").trim(),
+            fatherName: String(contact?.fatherName ?? "").trim() || null,
+            fatherPhoneNumber: String(contact?.fatherPhoneNumber ?? "").trim() || null,
+            motherName: String(contact?.motherName ?? "").trim() || null,
+            motherPhoneNumber: String(contact?.motherPhoneNumber ?? "").trim() || null,
             notes: String(contact?.notes ?? "").trim() || null,
           }))
-          .filter((contact) => contact.name && contact.phoneNumber);
+          .filter(
+            (contact) =>
+              contact.name &&
+              (contact.fatherPhoneNumber || contact.motherPhoneNumber),
+          );
       }
     } catch {
       throw new Error("Invalid contacts payload");
@@ -71,7 +85,11 @@ export async function createGroup(formData: FormData) {
           id: crypto.randomUUID(),
           groupId: id,
           name: contact.name,
-          phoneNumber: contact.phoneNumber,
+            phoneNumber: contact.fatherPhoneNumber || contact.motherPhoneNumber || "",
+            fatherName: contact.fatherName,
+            fatherPhoneNumber: contact.fatherPhoneNumber,
+            motherName: contact.motherName,
+            motherPhoneNumber: contact.motherPhoneNumber,
           notes: contact.notes,
         })),
       );
@@ -149,10 +167,15 @@ export async function addContact(formData: FormData) {
 
   const groupId = formData.get("groupId")?.toString();
   const name = formData.get("name")?.toString().trim();
-  const phoneNumber = formData.get("phoneNumber")?.toString().trim();
+  const fatherName = formData.get("fatherName")?.toString().trim() || null;
+  const fatherPhoneNumber = formData.get("fatherPhoneNumber")?.toString().trim() || null;
+  const motherName = formData.get("motherName")?.toString().trim() || null;
+  const motherPhoneNumber = formData.get("motherPhoneNumber")?.toString().trim() || null;
   const notes = formData.get("notes")?.toString().trim() || null;
 
-  if (!groupId || !name || !phoneNumber) throw new Error("Group ID, name, and phone number are required");
+  if (!groupId || !name || (!fatherPhoneNumber && !motherPhoneNumber)) {
+    throw new Error("Group ID, kid name, and at least one parent phone are required");
+  }
 
   const group = await db.query.kidzeeVadgaonsheriContactGroup.findFirst({
     where: and(eq(kidzeeVadgaonsheriContactGroup.id, groupId), eq(kidzeeVadgaonsheriContactGroup.createdBy, user.id)),
@@ -166,7 +189,11 @@ export async function addContact(formData: FormData) {
     id,
     groupId,
     name,
-    phoneNumber,
+    phoneNumber: fatherPhoneNumber || motherPhoneNumber || "",
+    fatherName,
+    fatherPhoneNumber,
+    motherName,
+    motherPhoneNumber,
     notes,
   });
 
