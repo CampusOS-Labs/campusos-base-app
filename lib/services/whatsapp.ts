@@ -168,7 +168,8 @@ export class WhatsAppManager {
 
   async connect(
     name: string,
-  ): Promise<{ base64?: string; state: string }> {
+    number?: string,
+  ): Promise<{ base64?: string; pairingCode?: string; state: string }> {
     await this.getOrCreateInstance(name)
 
     const inst = this.instances.get(name)
@@ -179,12 +180,25 @@ export class WhatsAppManager {
       if (i > 0) await new Promise((r) => setTimeout(r, delays[i - 1]))
 
       try {
+        const query = number ? `?number=${encodeURIComponent(number)}` : ""
         const data = await this.api(
           "GET",
-          `/instance/connect/${encodeURIComponent(name)}`,
+          `/instance/connect/${encodeURIComponent(name)}${query}`,
         )
 
         const qr = this.extractQr(data)
+        const pairingCode = String(
+          data?.qrcode?.pairingCode ??
+            data?.qr?.pairingCode ??
+            data?.pairingCode ??
+            "",
+        ).trim()
+
+        if (pairingCode) {
+          inst.state = "connecting"
+          return { pairingCode, state: "connecting" }
+        }
+
         if (qr) {
           inst.state = "connecting"
           return { base64: qr, state: "connecting" }
