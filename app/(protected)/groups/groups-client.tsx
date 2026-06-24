@@ -50,10 +50,6 @@ type Contact = {
   id: string;
   name: string;
   phoneNumber: string;
-  fatherName: string | null;
-  fatherPhoneNumber: string | null;
-  motherName: string | null;
-  motherPhoneNumber: string | null;
   notes: string | null;
 };
 
@@ -74,10 +70,7 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
 
   const [showAddContactDialog, setShowAddContactDialog] = useState(false);
   const [addContactName, setAddContactName] = useState("");
-  const [addFatherName, setAddFatherName] = useState("");
-  const [addFatherPhone, setAddFatherPhone] = useState("");
-  const [addMotherName, setAddMotherName] = useState("");
-  const [addMotherPhone, setAddMotherPhone] = useState("");
+  const [addContactPhone, setAddContactPhone] = useState("");
   const [addContactNotes, setAddContactNotes] = useState("");
 
   const [busy, setBusy] = useState(false);
@@ -222,18 +215,12 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
       const fd = new FormData();
       fd.set("groupId", selectedGroup);
       fd.set("name", addContactName);
-      fd.set("fatherName", addFatherName);
-      fd.set("fatherPhoneNumber", addFatherPhone);
-      fd.set("motherName", addMotherName);
-      fd.set("motherPhoneNumber", addMotherPhone);
+      fd.set("phoneNumber", addContactPhone);
       fd.set("notes", addContactNotes);
       await addContact(fd);
       setShowAddContactDialog(false);
       setAddContactName("");
-      setAddFatherName("");
-      setAddFatherPhone("");
-      setAddMotherName("");
-      setAddMotherPhone("");
+      setAddContactPhone("");
       setAddContactNotes("");
       window.location.reload();
     } catch {}
@@ -323,11 +310,7 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
                           <div>
                             <p className="text-sm font-medium">{contact.name}</p>
                             <p className="text-xs text-muted-foreground">
-                              {`Father: ${contact.fatherName || "-"}, father's contact: ${
-                                contact.fatherPhoneNumber || "-"
-                              }, mother: ${contact.motherName || "-"}, mother's contact: ${
-                                contact.motherPhoneNumber || "-"
-                              }`}
+                              {contact.phoneNumber}
                             </p>
                           </div>
                         </div>
@@ -512,7 +495,7 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="addName">
-                Kid name
+                Name
               </label>
               <Input
                 id="addName"
@@ -523,46 +506,14 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="addPhone">
-                Father name
+                Phone Number
               </label>
               <Input
-                id="addFatherName"
-                value={addFatherName}
-                onChange={(e) => setAddFatherName(e.target.value)}
-                placeholder="Father full name"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="addFatherPhone">
-                Father contact
-              </label>
-              <Input
-                id="addFatherPhone"
-                value={addFatherPhone}
-                onChange={(e) => setAddFatherPhone(e.target.value)}
-                placeholder="+919876543210"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="addMotherName">
-                Mother name
-              </label>
-              <Input
-                id="addMotherName"
-                value={addMotherName}
-                onChange={(e) => setAddMotherName(e.target.value)}
-                placeholder="Mother full name"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="addMotherPhone">
-                Mother contact
-              </label>
-              <Input
-                id="addMotherPhone"
-                value={addMotherPhone}
-                onChange={(e) => setAddMotherPhone(e.target.value)}
-                placeholder="+919876543210"
+                id="addPhone"
+                value={addContactPhone}
+                onChange={(e) => setAddContactPhone(e.target.value)}
+                placeholder="+15551234567"
+                required
               />
             </div>
             <div className="space-y-2">
@@ -585,11 +536,7 @@ export function GroupsClient({ initialGroups }: { initialGroups: GroupSummary[] 
             </Button>
             <Button
               onClick={handleAddContact}
-              disabled={
-                busy ||
-                !addContactName.trim() ||
-                (!addFatherPhone.trim() && !addMotherPhone.trim())
-              }
+              disabled={busy || !addContactName.trim() || !addContactPhone.trim()}
             >
               Add
             </Button>

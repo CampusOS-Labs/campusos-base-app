@@ -6,7 +6,7 @@ import { AttendanceClient } from "./attendance-client";
 
 export const metadata: Metadata = {
   title: "Attendance",
-  description: "Teacher check-in status and QR code for Kidzee Vadgaon Sheri.",
+  description: "Teacher check-in status and QR code for Kidzee Mundhwa.",
 };
 
 export default async function AttendancePage() {

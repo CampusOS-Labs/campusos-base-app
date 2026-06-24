@@ -105,7 +105,6 @@ export function AttendanceClient({ initialSummary }: { initialSummary: Summary }
     <PageShell className="space-y-8">
       <PageHeader
         title="Attendance"
-        description={`${formatTodayLabel()} · Teachers scan the QR, select their name, and check in on the website.`}
         actions={
           <Button
             variant="outline"

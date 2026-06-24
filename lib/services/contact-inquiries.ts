@@ -2,7 +2,7 @@ import { desc } from "drizzle-orm"
 import type { z } from "zod"
 
 import { db } from "@/lib/db"
-import { contactInquiry } from "@/lib/db/schema"
+import { contactInquiry } from "@/lib/db/contact-inquiry-schema"
 import { contactInquirySchema } from "@/lib/schemas/contact-inquiry"
 
 type ContactInquiryInput = z.infer<typeof contactInquirySchema>

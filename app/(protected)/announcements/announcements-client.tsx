@@ -406,11 +406,7 @@ function AnnouncementsClientInner({
       const allParentsMap = new Map<string, Recipient>();
       for (const { group, data: groupData } of groupContactsData) {
         const recipients: Recipient[] = groupData.contacts.flatMap((contact) => {
-          const entries = [
-            { name: contact.fatherName, phone: contact.fatherPhoneNumber },
-            { name: contact.motherName, phone: contact.motherPhoneNumber },
-          ];
-          return entries
+          return [{ name: contact.name, phone: contact.phoneNumber }]
             .map((entry) => {
               const phone = normalizePhone(entry.phone || "");
               if (!phone) return null;
