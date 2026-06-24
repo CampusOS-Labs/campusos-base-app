@@ -8,10 +8,7 @@ import { cn } from "@/lib/utils";
 
 export type ContactDraft = {
   name: string;
-  fatherName: string;
-  fatherPhoneNumber: string;
-  motherName: string;
-  motherPhoneNumber: string;
+  phoneNumber: string;
   notes: string;
 };
 
@@ -31,9 +28,7 @@ export function ContactDraftList({
   className,
 }: ContactDraftListProps) {
   const validCount = contacts.filter(
-    (contact) =>
-      contact.name.trim() &&
-      (contact.fatherPhoneNumber.trim() || contact.motherPhoneNumber.trim()),
+    (contact) => contact.name.trim() && contact.phoneNumber.trim(),
   ).length;
 
   return (
@@ -53,19 +48,19 @@ export function ContactDraftList({
             >
               <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-start">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Kid name</label>
+                  <label className="text-xs font-medium text-muted-foreground">Name</label>
                   <Input
                     value={contact.name}
                     onChange={(e) => onChange(index, "name", e.target.value)}
-                    placeholder="Student name"
+                    placeholder="Parent name"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Father name</label>
+                  <label className="text-xs font-medium text-muted-foreground">Phone</label>
                   <Input
-                    value={contact.fatherName}
-                    onChange={(e) => onChange(index, "fatherName", e.target.value)}
-                    placeholder="Father full name"
+                    value={contact.phoneNumber}
+                    onChange={(e) => onChange(index, "phoneNumber", e.target.value)}
+                    placeholder="919876543210"
                   />
                 </div>
                 <div className="flex items-end justify-end sm:pt-6">
@@ -80,43 +75,15 @@ export function ContactDraftList({
                   </Button>
                 </div>
               </div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Father phone</label>
-                  <Input
-                    value={contact.fatherPhoneNumber}
-                    onChange={(e) => onChange(index, "fatherPhoneNumber", e.target.value)}
-                    placeholder="919876543210"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Mother name</label>
-                  <Input
-                    value={contact.motherName}
-                    onChange={(e) => onChange(index, "motherName", e.target.value)}
-                    placeholder="Mother full name"
-                  />
-                </div>
-              </div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Mother phone</label>
-                  <Input
-                    value={contact.motherPhoneNumber}
-                    onChange={(e) => onChange(index, "motherPhoneNumber", e.target.value)}
-                    placeholder="919876543210"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Notes (optional)
-                  </label>
-                  <Input
-                    value={contact.notes}
-                    onChange={(e) => onChange(index, "notes", e.target.value)}
-                    placeholder="e.g. Nursery A"
-                  />
-                </div>
+              <div className="mt-2 space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Notes (optional)
+                </label>
+                <Input
+                  value={contact.notes}
+                  onChange={(e) => onChange(index, "notes", e.target.value)}
+                  placeholder="e.g. Nursery A"
+                />
               </div>
             </div>
           ))}
@@ -139,29 +106,15 @@ export function ContactDraftList({
 }
 
 export function createEmptyContactDraft(): ContactDraft {
-  return {
-    name: "",
-    fatherName: "",
-    fatherPhoneNumber: "",
-    motherName: "",
-    motherPhoneNumber: "",
-    notes: "",
-  };
+  return { name: "", phoneNumber: "", notes: "" };
 }
 
 export function getValidContactDrafts(contacts: ContactDraft[]) {
   return contacts
-    .filter(
-      (contact) =>
-        contact.name.trim() &&
-        (contact.fatherPhoneNumber.trim() || contact.motherPhoneNumber.trim()),
-    )
+    .filter((contact) => contact.name.trim() && contact.phoneNumber.trim())
     .map((contact) => ({
       name: contact.name.trim(),
-      fatherName: contact.fatherName.trim() || null,
-      fatherPhoneNumber: contact.fatherPhoneNumber.trim() || null,
-      motherName: contact.motherName.trim() || null,
-      motherPhoneNumber: contact.motherPhoneNumber.trim() || null,
+      phoneNumber: contact.phoneNumber.trim(),
       notes: contact.notes.trim() || null,
     }));
 }
