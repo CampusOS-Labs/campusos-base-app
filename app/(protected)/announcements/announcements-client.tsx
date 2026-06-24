@@ -93,10 +93,17 @@ function toQrSrc(value: unknown): string | null {
   return null;
 }
 
-function parseConnectPayload(data: any): { qr: string | null; state: string } {
+function parseConnectPayload(data: any): {
+  qr: string | null;
+  pairingCode: string | null;
+  state: string;
+} {
   const qr = toQrSrc(data?.qr ?? data?.base64 ?? data?.qrcode?.base64 ?? data?.qrcode);
+  const pairingCode = String(
+    data?.pairingCode ?? data?.qrcode?.pairingCode ?? data?.qr?.pairingCode ?? "",
+  ).trim();
   const state = String(data?.instance?.state || data?.state || "").toLowerCase();
-  return { qr, state };
+  return { qr, pairingCode: pairingCode || null, state };
 }
 
 function paymentLinkForInvoice(invoiceId: string): string {
@@ -110,6 +117,48 @@ function isPaymentReminder(type: string): boolean {
 
 function randomDelay(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function normalizePairingPhoneInput(value: string): {
+  normalized: string;
+  error?: string;
+} {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return { normalized: "", error: "Enter a valid WhatsApp number with country code." };
+  }
+
+  const sanitized = raw.replace(/[^\d+]/g, "");
+  if (!sanitized) {
+    return { normalized: "", error: "Enter a valid WhatsApp number with country code." };
+  }
+
+  let candidate = sanitized;
+  if (candidate.startsWith("+")) candidate = candidate.slice(1);
+  if (candidate.startsWith("00")) candidate = candidate.slice(2);
+
+  const digits = candidate.replace(/[^\d]/g, "");
+  if (!digits) {
+    return { normalized: "", error: "Enter a valid WhatsApp number with country code." };
+  }
+
+  if (digits.startsWith("0")) {
+    return {
+      normalized: "",
+      error:
+        "Number must start with country code. Example: 91XXXXXXXXXX or 1XXXXXXXXXX.",
+    };
+  }
+
+  if (digits.length < 11 || digits.length > 15) {
+    return {
+      normalized: "",
+      error:
+        "Use full international format (country code + number), 11 to 15 digits.",
+    };
+  }
+
+  return { normalized: digits };
 }
 
 async function api(method: string, path: string, body?: unknown, timeoutMs = 15000) {
@@ -184,7 +233,10 @@ function AnnouncementsClientInner({
 
   const [connectionState, setConnectionState] = useState<ConnectionState>("unknown");
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [pairingPhone, setPairingPhone] = useState("");
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [isOtpSubmitting, setIsOtpSubmitting] = useState(false);
   const [audienceGroups, setAudienceGroups] = useState<AudienceGroup[]>([]);
   const [recipientsByAudience, setRecipientsByAudience] = useState<Map<string, Recipient[]>>(
     new Map(),
@@ -218,6 +270,7 @@ function AnnouncementsClientInner({
     if (normalized === "open") {
       setConnectionState("open");
       setQrCode(null);
+      setPairingCode(null);
       setStatus("WhatsApp connected.");
       if (!whatsappOpenTrackedRef.current) {
         whatsappOpenTrackedRef.current = true;
@@ -231,6 +284,7 @@ function AnnouncementsClientInner({
       setStatus("Unable to confirm connection. Retrying...");
     } else {
       setConnectionState("close");
+      setPairingCode(null);
       setStatus("WhatsApp disconnected.");
     }
   }
@@ -246,10 +300,12 @@ function AnnouncementsClientInner({
       }
       setConnectionState("close");
       setQrCode(null);
+      setPairingCode(null);
       setStatus("WhatsApp disconnected.");
     } catch {
       setConnectionState("close");
       setQrCode(null);
+      setPairingCode(null);
       setStatus("WhatsApp disconnected.");
     }
   }
@@ -289,6 +345,7 @@ function AnnouncementsClientInner({
       }
       stopPolling();
       setQrCode(null);
+      setPairingCode(null);
       setConnectionState("close");
       setStatus("Connection expired. Try again.", true);
       return;
@@ -316,6 +373,7 @@ function AnnouncementsClientInner({
     try {
       setIsRunning(true);
       stopPolling();
+      setPairingCode(null);
       await api("POST", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME }).catch(() => {});
       const stateData = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/state`);
       const state = stateData?.instance?.state || stateData?.state || "";
@@ -325,6 +383,9 @@ function AnnouncementsClientInner({
       }
       const data = await api("GET", `/api/whatsapp/instance/${INSTANCE_NAME}/connect`);
       const connectPayload = parseConnectPayload(data);
+      if (connectPayload.pairingCode) {
+        setPairingCode(connectPayload.pairingCode);
+      }
       if (connectPayload.qr) {
         setQrCode(connectPayload.qr);
         setConnectionState("connecting");
@@ -350,6 +411,54 @@ function AnnouncementsClientInner({
     }
   }
 
+  async function onConnectWithOtp() {
+    const { normalized, error } = normalizePairingPhoneInput(pairingPhone);
+    if (error) {
+      setStatus(error, true);
+      return;
+    }
+
+    try {
+      setIsOtpSubmitting(true);
+      stopPolling();
+      setQrCode(null);
+      setPairingCode(null);
+      // Ensure each OTP request starts from a clean Evolution pairing state.
+      await api("DELETE", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME }).catch(() => {});
+      await api("POST", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME }).catch(() => {});
+      const data = await api("POST", `/api/whatsapp/instance/${INSTANCE_NAME}/connect`, {
+        number: normalized,
+      });
+      const connectPayload = parseConnectPayload(data);
+
+      if (connectPayload.pairingCode) {
+        setPairingCode(connectPayload.pairingCode);
+        setConnectionState("connecting");
+        setStatus("Enter the OTP code in WhatsApp on your phone to finish linking.");
+        startPolling();
+        return;
+      }
+
+      if (connectPayload.state === "open") {
+        applyConnectionState("open");
+        return;
+      }
+
+      if (connectPayload.state === "connecting" || connectPayload.state === "syncing") {
+        setConnectionState("connecting");
+        setStatus("Waiting for OTP verification on your phone...");
+        startPolling();
+        return;
+      }
+
+      setStatus("Could not generate an OTP code. Try again.", true);
+    } catch {
+      setStatus("Failed to generate OTP code. Try again.", true);
+    } finally {
+      setIsOtpSubmitting(false);
+    }
+  }
+
   async function onLogout() {
     try {
       setIsRunning(true);
@@ -357,6 +466,7 @@ function AnnouncementsClientInner({
       await api("DELETE", "/api/whatsapp/instance", { instanceName: INSTANCE_NAME });
       setConnectionState("close");
       setQrCode(null);
+      setPairingCode(null);
       setStatus("WhatsApp disconnected.");
     } catch {
       // silently fail
@@ -758,9 +868,14 @@ function AnnouncementsClientInner({
           <WhatsAppPanel
             connectionState={connectionState}
             qrCode={qrCode}
+            pairingPhone={pairingPhone}
+            pairingCode={pairingCode}
+            isOtpSubmitting={isOtpSubmitting}
             isRunning={isRunning}
             onLogout={onLogout}
             onConnect={onConnect}
+            onPairingPhoneChange={setPairingPhone}
+            onConnectWithOtp={onConnectWithOtp}
           />
         </WizardStep>
 
