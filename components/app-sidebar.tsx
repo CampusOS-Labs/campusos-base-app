@@ -194,10 +194,10 @@ function AppSidebarInner({ className, ...props }: React.ComponentProps<typeof Si
                 isActive={isPathActive(pathname, "/home")}
               />
               <NavItem
-                href="/payments"
-                title="Payments"
-                icon={<CreditCardIcon />}
-                isActive={isPathActive(pathname, "/payments")}
+                href="/attendance"
+                title="Attendance"
+                icon={<CalendarCheckIcon />}
+                isActive={isPathActive(pathname, "/attendance")}
               />
             </SidebarMenu>
           </SidebarGroupContent>

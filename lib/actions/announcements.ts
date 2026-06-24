@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { SCHOOL_ID } from "@/lib/constants";
-import { kidzeeVadgaonsheriAnnouncementLog } from "@/lib/db/schema";
+import { kidzeeMundhwaAnnouncementLog } from "@/lib/db/schema";
 import {
   ANNOUNCEMENT_SENT,
   trackProductEvent,
@@ -29,7 +29,7 @@ export async function logAnnouncement(data: {
 
   const id = crypto.randomUUID();
 
-  await db.insert(kidzeeVadgaonsheriAnnouncementLog).values({
+  await db.insert(kidzeeMundhwaAnnouncementLog).values({
     id,
     userId: user.id,
     title: data.title,

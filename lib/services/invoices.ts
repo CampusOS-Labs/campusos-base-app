@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm"
 import { cacheLife, cacheTag, revalidateTag } from "next/cache"
 
 import { db } from "@/lib/db"
-import { kidzeeVadgaonsheriInvoices } from "@/lib/db/schema"
+import { kidzeeMundhwaInvoices } from "@/lib/db/schema"
 
 export type Invoice = {
   invoiceNumber: string
@@ -32,7 +32,7 @@ type PaymentDetails = {
   source?: string
 }
 
-function rowToInvoice(row: typeof kidzeeVadgaonsheriInvoices.$inferSelect): Invoice {
+function rowToInvoice(row: typeof kidzeeMundhwaInvoices.$inferSelect): Invoice {
   return {
     invoiceNumber: row.invoiceNumber,
     academicYear: row.academicYear,
@@ -62,8 +62,8 @@ export async function listInvoices(): Promise<Invoice[]> {
   try {
     const rows = await db
       .select()
-      .from(kidzeeVadgaonsheriInvoices)
-      .orderBy(kidzeeVadgaonsheriInvoices.invoiceNumber)
+      .from(kidzeeMundhwaInvoices)
+      .orderBy(kidzeeMundhwaInvoices.invoiceNumber)
 
     return rows.map(rowToInvoice)
   } catch {
@@ -80,8 +80,8 @@ export async function getInvoiceById(
 
   const [row] = await db
     .select()
-    .from(kidzeeVadgaonsheriInvoices)
-    .where(eq(kidzeeVadgaonsheriInvoices.invoiceNumber, invoiceId))
+    .from(kidzeeMundhwaInvoices)
+    .where(eq(kidzeeMundhwaInvoices.invoiceNumber, invoiceId))
     .limit(1)
 
   if (!row) {
@@ -96,7 +96,7 @@ export async function markInvoicePaid(
   paymentDetails: PaymentDetails,
 ): Promise<Invoice> {
   const [row] = await db
-    .update(kidzeeVadgaonsheriInvoices)
+    .update(kidzeeMundhwaInvoices)
     .set({
       status: "paid",
       paymentDetails: {
@@ -104,7 +104,7 @@ export async function markInvoicePaid(
         updatedAt: new Date().toISOString(),
       },
     })
-    .where(eq(kidzeeVadgaonsheriInvoices.invoiceNumber, invoiceId))
+    .where(eq(kidzeeMundhwaInvoices.invoiceNumber, invoiceId))
     .returning()
 
   if (!row) {

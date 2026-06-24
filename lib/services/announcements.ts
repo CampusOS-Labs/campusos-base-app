@@ -2,15 +2,15 @@ import { eq, desc } from "drizzle-orm";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { kidzeeVadgaonsheriAnnouncementLog } from "@/lib/db/schema";
+import { kidzeeMundhwaAnnouncementLog } from "@/lib/db/schema";
 
 export async function getAnnouncementHistory() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user?.id) throw new Error("Unauthorized");
 
-  const logs = await db.query.kidzeeVadgaonsheriAnnouncementLog.findMany({
-    where: eq(kidzeeVadgaonsheriAnnouncementLog.userId, session.user.id),
-    orderBy: [desc(kidzeeVadgaonsheriAnnouncementLog.createdAt)],
+  const logs = await db.query.kidzeeMundhwaAnnouncementLog.findMany({
+    where: eq(kidzeeMundhwaAnnouncementLog.userId, session.user.id),
+    orderBy: [desc(kidzeeMundhwaAnnouncementLog.createdAt)],
     limit: 50,
   });
 

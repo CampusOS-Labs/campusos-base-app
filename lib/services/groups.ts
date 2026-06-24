@@ -1,14 +1,15 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { kidzeeVadgaonsheriContactGroup } from "@/lib/db/schema";
+import { kidzeeMundhwaContactGroup } from "@/lib/db/schema";
 
 export async function getUserGroups() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user?.id) throw new Error("Unauthorized");
 
-  const groups = await db.query.kidzeeVadgaonsheriContactGroup.findMany({
+  const groups = await db.query.kidzeeMundhwaContactGroup.findMany({
+    where: eq(kidzeeMundhwaContactGroup.createdBy, session.user.id),
     with: {
       contacts: true,
     },
@@ -28,8 +29,8 @@ export async function getGroupWithContacts(groupId: string) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user?.id) throw new Error("Unauthorized");
 
-  const group = await db.query.kidzeeVadgaonsheriContactGroup.findFirst({
-    where: eq(kidzeeVadgaonsheriContactGroup.id, groupId),
+  const group = await db.query.kidzeeMundhwaContactGroup.findFirst({
+    where: and(eq(kidzeeMundhwaContactGroup.id, groupId), eq(kidzeeMundhwaContactGroup.createdBy, session.user.id)),
     with: {
       contacts: {
         orderBy: (c, { asc }) => [asc(c.name)],
@@ -49,10 +50,6 @@ export async function getGroupWithContacts(groupId: string) {
       id: c.id,
       name: c.name,
       phoneNumber: c.phoneNumber,
-      fatherName: c.fatherName,
-      fatherPhoneNumber: c.fatherPhoneNumber,
-      motherName: c.motherName,
-      motherPhoneNumber: c.motherPhoneNumber,
       notes: c.notes,
     })),
   };
