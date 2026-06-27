@@ -14,8 +14,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "KidZee Mundhwa — CampusOS",
-    template: "%s | KidZee Mundhwa",
+    default: "Your School — CampusOS",
+    template: "%s | Your School",
   },
   description: "CampusOS base application for school operations and workflows.",
 };
