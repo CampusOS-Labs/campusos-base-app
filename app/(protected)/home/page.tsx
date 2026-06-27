@@ -13,7 +13,7 @@ import { HomeSupportContact } from "./home-support-contact"
 
 export const metadata: Metadata = {
   title: "Home",
-  description: "CampusOS dashboard for Kidzee Mundhwa.",
+  description: "CampusOS dashboard for Your School.",
 }
 
 type Invoice = {

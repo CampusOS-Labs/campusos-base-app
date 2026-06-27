@@ -14,6 +14,14 @@ import { isUnderDevelopmentRoute } from "@/lib/under-development-routes"
 
 const actions = [
   {
+    href: "/announcements",
+    label: "Send announcement",
+    icon: PaperPlaneTiltIcon,
+    iconClass: "bg-primary/10 text-primary",
+    featured: true,
+    disabled: false,
+  },
+  {
     href: "/attendance",
     label: "Attendance",
     icon: CalendarCheckIcon,
@@ -21,14 +29,6 @@ const actions = [
     featured: false,
     disabled: false,
   },
-  // {
-  //   href: "/announcements",
-  //   label: "Send announcement",
-  //   icon: PaperPlaneTiltIcon,
-  //   iconClass: "bg-primary/10 text-primary",
-  //   featured: true,
-  //   disabled: false,
-  // },
 ] as const
 
 function QuickActionCard({

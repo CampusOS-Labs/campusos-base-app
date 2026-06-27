@@ -1,4 +1,4 @@
-export const UNDER_DEVELOPMENT_ROUTES = ["/payments", "/logs"] as const;
+export const UNDER_DEVELOPMENT_ROUTES = ["/logs"] as const;
 
 export type UnderDevelopmentRoute = (typeof UNDER_DEVELOPMENT_ROUTES)[number];
 
